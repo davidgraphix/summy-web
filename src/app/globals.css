@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 240 33% 97%;      /* #F4F4FB lavender canvas */
+  --foreground: 249 42% 13%;      /* #14122E ink */
+  --card: 0 0% 100%;
+  --card-foreground: 249 42% 13%;
+  --primary: 250 75% 44%;         /* #2E1CC4 electric indigo */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 33% 94%;
+  --secondary-foreground: 249 42% 13%;
+  --muted: 240 20% 92%;
+  --muted-foreground: 250 9% 47%; /* #6A6A85 */
+  --accent: 187 80% 43%;          /* #16B8C9 teal starburst */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 347 77% 50%;     /* #E11D48 */
+  --destructive-foreground: 0 0% 100%;
+  --success: 142 71% 45%;         /* #16A34A */
+  --success-foreground: 0 0% 100%;
+  --border: 240 27% 92%;          /* #E7E7F2 */
+  --input: 240 27% 92%;
+  --ring: 250 75% 44%;
+  --radius: 0.75rem;
+}
+
+* { border-color: hsl(var(--border)); }
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+}
+
+.marquee-track { animation: marquee 32s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+.line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
+
+/* ---------------------------------------------------------------------------
+   Dark theme. Added for the admin dashboard; applies app-wide via next-themes
+   (class strategy). Light-mode values above are unchanged.
+   --------------------------------------------------------------------------- */
+.dark {
+  --background: 250 24% 8%;        /* #100E1A deep indigo-black */
+  --foreground: 240 33% 97%;
+  --card: 250 20% 11%;             /* #17151F elevated surface */
+  --card-foreground: 240 33% 97%;
+  --primary: 250 85% 66%;          /* lifted indigo for contrast on dark */
+  --primary-foreground: 250 40% 10%;
+  --secondary: 250 15% 17%;
+  --secondary-foreground: 240 33% 97%;
+  --muted: 250 14% 18%;
+  --muted-foreground: 245 12% 65%;
+  --accent: 187 75% 52%;
+  --accent-foreground: 250 40% 10%;
+  --destructive: 347 80% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 142 65% 50%;
+  --success-foreground: 250 40% 10%;
+  --border: 250 14% 20%;
+  --input: 250 14% 20%;
+  --ring: 250 85% 66%;
+}
+
+/* Prevent flash of wrong theme before next-themes hydrates. */
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+/* Admin surfaces sit slightly above the page background. */
+.admin-surface { background: hsl(var(--card)); }
+
+@keyframes overlay-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes content-in { from { opacity: 0; transform: translateY(6px) scale(.98) } to { opacity: 1; transform: none } }
+@keyframes sheet-in-right { from { transform: translateX(100%) } to { transform: translateX(0) } }
