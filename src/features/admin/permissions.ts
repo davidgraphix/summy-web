@@ -1,93 +1,105 @@
 "use client";
 
+import { useMemo } from "react";
 import { useAuthStore } from "@/features/auth/auth-store";
-import { useProfile } from "@/features/customer/customer-hooks";
+import { claimAsStringArray, decodeJwtPayload } from "@/lib/jwt";
 
 /**
- * Permission keys used by the UI to show/hide actions. These mirror the
- * conventional `resource.action` shape returned by GET /admin/roles/permissions.
- * TODO: reconcile these strings with the backend's actual permission keys —
- * they're referenced from one place (this file) so renaming is cheap.
+ * The canonical permission catalogue. Mirrors Summy.Shared.Constants.Permissions
+ * exactly (resource.action, lower-case, dot-separated) — that class is the
+ * single source of truth the backend seeds from and enforces against.
  */
 export const PERMISSIONS = {
-  dashboardView: "dashboard.view",
-  ordersView: "orders.view",
-  ordersManage: "orders.manage",
-  paymentsView: "payments.view",
-  paymentsManage: "payments.manage",
-  refundsManage: "refunds.manage",
-  productsView: "products.view",
-  productsManage: "products.manage",
-  inventoryManage: "inventory.manage",
-  categoriesManage: "categories.manage",
-  brandsManage: "brands.manage",
-  mediaManage: "media.manage",
-  customersView: "customers.view",
-  customersManage: "customers.manage",
   usersView: "users.view",
-  usersManage: "users.manage",
-  rolesManage: "roles.manage",
+  usersCreate: "users.create",
+  usersUpdate: "users.update",
+  usersDelete: "users.delete",
+  usersManageStatus: "users.manage_status",
+
+  rolesView: "roles.view",
+  rolesCreate: "roles.create",
+  rolesUpdate: "roles.update",
+  rolesDelete: "roles.delete",
+  rolesAssign: "roles.assign",
+
+  permissionsView: "permissions.view",
+  permissionsAssign: "permissions.assign",
+
+  productsView: "products.view",
+  productsCreate: "products.create",
+  productsUpdate: "products.update",
+  productsDelete: "products.delete",
+  productsManageInventory: "products.manage_inventory",
+
+  categoriesView: "categories.view",
+  categoriesCreate: "categories.create",
+  categoriesUpdate: "categories.update",
+  categoriesDelete: "categories.delete",
+
+  brandsView: "brands.view",
+  brandsCreate: "brands.create",
+  brandsUpdate: "brands.update",
+  brandsDelete: "brands.delete",
+
+  ordersView: "orders.view",
+  ordersUpdate: "orders.update",
+  ordersCancel: "orders.cancel",
+  ordersRefund: "orders.refund",
+
+  paymentsView: "payments.view",
+  paymentsRefund: "payments.refund",
+
+  customersView: "customers.view",
+  customersUpdate: "customers.update",
+
+  mediaView: "media.view",
+  mediaUpload: "media.upload",
+  mediaDelete: "media.delete",
+
+  reportsView: "reports.view",
+  reportsExport: "reports.export",
+
+  analyticsView: "analytics.view",
+  analyticsExport: "analytics.export",
+
+  auditLogsView: "audit_logs.view",
+
+  settingsView: "settings.view",
   settingsManage: "settings.manage",
-  emailsView: "emails.view",
-  auditView: "audit.view",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-/** Role names treated as unrestricted. TODO: confirm against backend seed data. */
-const SUPER_ROLES = ["admin", "administrator", "superadmin", "super admin", "owner"];
-
-interface PrincipalLike {
-  roles?: unknown;
-  roleNames?: unknown;
-  permissions?: unknown;
-  [key: string]: unknown;
-}
-
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
-  if (typeof value === "string") return [value];
-  return [];
-}
-
 /**
- * Reads roles/permissions off whichever principal object the backend returns.
- * The auth user and the /customers/me profile are both checked because the
- * contract doesn't specify which one carries role data.
+ * Reads the caller's granted permissions and roles. Roles come straight off
+ * UserDto (present on every login/refresh response); permissions are not part
+ * of that DTO — the backend only bakes them into the access token's
+ * `permission` claims (see AppClaimTypes.Permission / JwtTokenService), so
+ * they're read from there. This is a UX gate only: every endpoint is
+ * independently authorized server-side via the same claim.
  */
 export function useAdminPrincipal() {
-  const user = useAuthStore((s) => s.user) as PrincipalLike | null;
-  const { data: profile, isLoading } = useProfile();
-  const p = (profile ?? null) as PrincipalLike | null;
+  const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
 
-  const roles = [
-    ...toStringArray(user?.roles), ...toStringArray(user?.roleNames),
-    ...toStringArray(p?.roles), ...toStringArray(p?.roleNames),
-  ].map((r) => r.toLowerCase());
+  const permissions = useMemo(() => {
+    if (!accessToken) return [];
+    return claimAsStringArray(decodeJwtPayload(accessToken), "permission");
+  }, [accessToken]);
 
-  const permissions = [...toStringArray(user?.permissions), ...toStringArray(p?.permissions)];
+  const roles = useMemo(() => (user?.roles ?? []).map((r) => r.toLowerCase()), [user]);
+  const isStaff = !!user && user.userType !== "Customer";
 
-  const isSuperAdmin = roles.some((r) => SUPER_ROLES.includes(r));
-  // Any role at all beyond a plain customer implies staff access.
-  const isStaff = isSuperAdmin || permissions.length > 0 || roles.some((r) => r !== "customer" && r !== "user");
-
-  return { roles, permissions, isSuperAdmin, isStaff, isLoading, hasPrincipal: !!(user || profile) };
+  return { roles, permissions, isStaff, isLoading: false, hasPrincipal: !!user };
 }
 
 /**
- * Gate for a single permission. Super admins pass everything. If the backend
- * supplies no permission list at all, staff are allowed through rather than
- * locked out of their own dashboard — the API still enforces the real rules on
- * every request, so a false positive here shows a button that fails server-side
- * rather than granting actual access.
+ * Gate for a single permission — a plain claim lookup, matching
+ * PermissionAuthorizationHandler server-side exactly (no role-name bypass:
+ * the backend has none either).
  */
-
-
-
 export function useHasPermission(permission?: PermissionKey): boolean {
-  const { isSuperAdmin, isStaff, permissions } = useAdminPrincipal();
+  const { isStaff, permissions } = useAdminPrincipal();
   if (!permission) return isStaff;
-  if (isSuperAdmin) return true;
-  if (permissions.length === 0) return isStaff;
   return permissions.includes(permission);
 }

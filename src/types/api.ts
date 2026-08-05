@@ -12,16 +12,17 @@ export interface ApiEnvelope<T> {
   timestamp: string;
 }
 
-/**
- * Error payload. Exact field names are not documented in the contract.
- * TODO: confirm the real ApiError DTO (code/message/validationErrors names).
- */
+/** A single field-level validation failure, as returned by ApiError.ValidationErrors. */
+export interface ApiValidationError {
+  field: string;
+  message: string;
+}
+
+/** Error payload. Mirrors Summy.Shared.Wrappers.ApiError. */
 export interface ApiError {
-  code?: string;
-  message?: string;
-  details?: string;
-  /** Field-keyed validation messages, e.g. { email: ["Required"] }. TODO confirm. */
-  validationErrors?: Record<string, string[]>;
+  code: string;
+  message: string;
+  validationErrors: ApiValidationError[];
 }
 
 /** All paginated endpoints return this envelope shape (inside `data`). */

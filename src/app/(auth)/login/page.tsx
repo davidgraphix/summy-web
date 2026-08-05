@@ -31,10 +31,10 @@ function LoginForm() {
     } catch (e) {
       // Surface server-side field errors on the matching inputs.
       if (e instanceof ApiRequestError && e.validationErrors) {
-        for (const [field, messages] of Object.entries(e.validationErrors)) {
+        for (const { field, message } of e.validationErrors) {
           const key = field.charAt(0).toLowerCase() + field.slice(1);
           if (key === "email" || key === "password") {
-            form.setError(key, { message: messages[0] });
+            form.setError(key, { message });
           }
         }
       }

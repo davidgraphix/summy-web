@@ -1,7 +1,7 @@
 import { API_ROOT } from "./env";
 import type { ApiEnvelope, ApiError } from "@/types/api";
 import { useAuthStore } from "@/features/auth/auth-store";
-import type { AuthTokens } from "@/features/auth/auth-types";
+import type { AuthenticationResponse } from "@/features/auth/auth-types";
 
 /** Thrown for any non-successful envelope or transport failure. */
 export class ApiRequestError extends Error {
@@ -61,12 +61,12 @@ async function refreshTokens(): Promise<boolean> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
       });
-      const json = (await res.json().catch(() => null)) as ApiEnvelope<AuthTokens> | null;
+      const json = (await res.json().catch(() => null)) as ApiEnvelope<AuthenticationResponse> | null;
       if (!res.ok || !json?.success || !json.data) {
         store.clear();
         return false;
       }
-      store.setTokens(json.data);
+      store.setSession(json.data);
       return true;
     } catch {
       store.clear();

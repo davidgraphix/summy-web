@@ -6,15 +6,12 @@ import { authApi } from "./auth-api";
 import { useAuthStore } from "./auth-store";
 import { useMergeGuestCartOnLogin } from "@/features/cart/use-cart";
 import type {
-  AuthResult, ForgotPasswordRequest, LoginRequest, RegisterRequest,
+  AuthenticationResponse, ForgotPasswordRequest, LoginRequest, RegisterRequest,
   ResetPasswordRequest, VerifyEmailRequest,
 } from "./auth-types";
 
-function applySession(result: AuthResult) {
-  useAuthStore.getState().setSession(
-    { accessToken: result.accessToken, refreshToken: result.refreshToken, expiresIn: result.expiresIn },
-    result.user ?? null
-  );
+function applySession(session: AuthenticationResponse) {
+  useAuthStore.getState().setSession(session);
 }
 
 export function useLogin() {
@@ -22,8 +19,8 @@ export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: LoginRequest) => authApi.login(body),
-    onSuccess: async (result) => {
-      applySession(result);
+    onSuccess: async (session) => {
+      applySession(session);
       await mergeCart();
       qc.invalidateQueries();
     },
@@ -32,17 +29,9 @@ export function useLogin() {
 }
 
 export function useRegister() {
-  const mergeCart = useMergeGuestCartOnLogin();
   return useMutation({
+    // Registration never issues a session — the account must be email-verified first.
     mutationFn: (body: RegisterRequest) => authApi.register(body),
-    onSuccess: async (result) => {
-      // If the backend returns tokens on register, start the session; otherwise
-      // the UI routes the user to email verification.
-      if (result?.accessToken) {
-        applySession(result);
-        await mergeCart();
-      }
-    },
     onError: (e: Error) => toast.error(e.message || "Registration failed"),
   });
 }
@@ -50,7 +39,11 @@ export function useRegister() {
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => authApi.logout().catch(() => undefined),
+    mutationFn: () => {
+      const refreshToken = useAuthStore.getState().refreshToken;
+      if (!refreshToken) return Promise.resolve();
+      return authApi.logout({ refreshToken }).catch(() => undefined);
+    },
     onSettled: () => {
       useAuthStore.getState().clear();
       qc.clear();
@@ -59,8 +52,15 @@ export function useLogout() {
 }
 
 export function useVerifyEmail() {
+  const mergeCart = useMergeGuestCartOnLogin();
   return useMutation({
     mutationFn: (body: VerifyEmailRequest) => authApi.verifyEmail(body),
+    onSuccess: async (result) => {
+      if (result.autoLoggedIn && result.session) {
+        applySession(result.session);
+        await mergeCart();
+      }
+    },
     onError: (e: Error) => toast.error(e.message || "Verification failed"),
   });
 }

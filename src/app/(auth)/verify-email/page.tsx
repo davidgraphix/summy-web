@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, MailCheck, XCircle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useVerifyEmail, useResendVerification } from "@/features/auth/auth-hooks";
 
 function VerifyEmailInner() {
+  const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");
   const email = params.get("email") ?? "";
@@ -23,10 +24,16 @@ function VerifyEmailInner() {
   useEffect(() => {
     if (!token || attempted.current) return;
     attempted.current = true;
-    verify.mutateAsync({ token, email: email || undefined })
-      .then(() => setState("done"))
+    verify.mutateAsync({ token })
+      .then((result) => {
+        if (result.autoLoggedIn) {
+          router.replace("/dashboard");
+          return;
+        }
+        setState("done");
+      })
       .catch(() => setState("failed"));
-  }, [token, email, verify]);
+  }, [token, router, verify]);
 
   if (state === "verifying") {
     return (

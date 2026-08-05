@@ -1,44 +1,85 @@
 /**
- * Auth DTOs. The contract confirms JWT access + refresh tokens but not the
- * exact field names on the token/user payloads. Known/likely fields are typed;
- * unconfirmed ones are marked TODO.
+ * Auth DTOs. Mirrors Summy.Application.Features.Authentication.Dtos exactly.
  */
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  // TODO: confirm — expiresIn / accessTokenExpiresAt / tokenType may be present.
-  expiresIn?: number;
-  accessTokenExpiresAt?: string;
-}
-
+/** Mirrors UserDto. */
 export interface AuthUser {
   id: string;
   email: string;
-  // TODO: confirm user fields returned on login (firstName/lastName/emailVerified/roles).
-  firstName?: string;
-  lastName?: string;
-  fullName?: string;
-  emailVerified?: boolean;
+  firstName: string;
+  lastName: string;
+  userType: string;
+  status: string;
+  emailConfirmed: boolean;
+  referralCode: string;
+  roles: string[];
 }
 
-/** Some backends return tokens + user together on login/register. TODO confirm. */
-export interface AuthResult extends AuthTokens {
-  user?: AuthUser;
+/** Mirrors AuthenticationResponse. */
+export interface AuthenticationResponse {
+  accessToken: string;
+  accessTokenExpiresAtUtc: string;
+  refreshToken: string;
+  refreshTokenExpiresAtUtc: string;
+  user: AuthUser;
 }
 
-export interface LoginRequest { email: string; password: string; }
+/** Mirrors RegistrationResponse — register never issues a session; email verification is required first. */
+export interface RegistrationResponse {
+  userId: string;
+  email: string;
+  requiresEmailVerification: boolean;
+  message: string;
+}
+
+/** Mirrors EmailVerificationResult. */
+export interface EmailVerificationResult {
+  autoLoggedIn: boolean;
+  message: string;
+  session: AuthenticationResponse | null;
+}
+
+/** Mirrors MessageResponse. */
+export interface MessageResponse {
+  message: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
 export interface RegisterRequest {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
-  // TODO: confirm — phoneNumber / referralCode may be accepted.
   phoneNumber?: string;
   referralCode?: string;
 }
-export interface RefreshRequest { refreshToken: string; }
-export interface VerifyEmailRequest { token: string; email?: string; }
-export interface ResendVerificationRequest { email: string; }
-export interface ForgotPasswordRequest { email: string; }
-export interface ResetPasswordRequest { token: string; email?: string; newPassword: string; }
+
+export interface RefreshRequest {
+  refreshToken: string;
+}
+
+export interface LogoutRequest {
+  refreshToken: string;
+}
+
+export interface VerifyEmailRequest {
+  token: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}

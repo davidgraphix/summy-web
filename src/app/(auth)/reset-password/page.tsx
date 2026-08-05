@@ -17,7 +17,6 @@ import { resetPasswordSchema, type ResetPasswordValues } from "@/features/auth/a
 function ResetPasswordForm() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
-  const email = params.get("email") ?? undefined;
 
   const reset = useResetPassword();
   const [done, setDone] = useState(false);
@@ -30,7 +29,7 @@ function ResetPasswordForm() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await reset.mutateAsync({ token, email, newPassword: values.newPassword });
+      await reset.mutateAsync({ token, newPassword: values.newPassword, confirmPassword: values.confirmPassword });
       setDone(true);
     } catch {
       // Toast already shown by the hook.

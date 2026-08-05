@@ -14,7 +14,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { useRegister } from "@/features/auth/auth-hooks";
 import { registerSchema, type RegisterValues } from "@/features/auth/auth-schemas";
 import { ApiRequestError } from "@/lib/api-client";
-import { useAuthStore } from "@/features/auth/auth-store";
 
 function RegisterForm() {
   const router = useRouter();
@@ -39,18 +38,13 @@ function RegisterForm() {
         referralCode: values.referralCode || undefined,
       });
 
-      // Auth flow: Register → Email Verification → Login. If the backend issued
-      // tokens immediately, skip straight through.
-      if (useAuthStore.getState().isAuthenticated) {
-        router.replace(redirect);
-      } else {
-        router.replace(`/verify-email?email=${encodeURIComponent(values.email)}`);
-      }
+      // Registration never issues a session — the account must be verified first.
+      router.replace(`/verify-email?email=${encodeURIComponent(values.email)}`);
     } catch (e) {
       if (e instanceof ApiRequestError && e.validationErrors) {
-        for (const [field, messages] of Object.entries(e.validationErrors)) {
+        for (const { field, message } of e.validationErrors) {
           const key = (field.charAt(0).toLowerCase() + field.slice(1)) as keyof RegisterValues;
-          if (key in form.getValues()) form.setError(key, { message: messages[0] });
+          if (key in form.getValues()) form.setError(key, { message });
         }
       }
     }

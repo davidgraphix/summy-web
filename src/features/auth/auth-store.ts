@@ -2,15 +2,14 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AuthTokens, AuthUser } from "./auth-types";
+import type { AuthenticationResponse, AuthUser } from "./auth-types";
 
 interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
-  setSession: (tokens: AuthTokens, user?: AuthUser | null) => void;
-  setTokens: (tokens: AuthTokens) => void;
+  setSession: (session: AuthenticationResponse) => void;
   setUser: (user: AuthUser | null) => void;
   clear: () => void;
 }
@@ -29,18 +28,14 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       user: null,
       isAuthenticated: false,
-      setSession: (tokens, user) => {
+      setSession: (session) => {
         setAuthCookie(true);
         set({
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          user: user ?? null,
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          user: session.user,
           isAuthenticated: true,
         });
-      },
-      setTokens: (tokens) => {
-        setAuthCookie(true);
-        set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, isAuthenticated: true });
       },
       setUser: (user) => set({ user }),
       clear: () => {
