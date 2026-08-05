@@ -46,6 +46,7 @@ export default function SecurityPage() {
       await changePassword.mutateAsync({
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
+        confirmPassword: values.confirmPassword,
       });
       form.reset();
     } catch {
@@ -101,10 +102,16 @@ export default function SecurityPage() {
         <CardContent className="p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-bold">Active sessions</h2>
-            <Button variant="outline" size="sm" onClick={() => m.logoutOthers.mutate()}
-              disabled={m.logoutOthers.isPending}>
-              <LogOut size={15} /> Sign out other devices
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => m.logoutOthers.mutate()}
+                disabled={m.logoutOthers.isPending}>
+                <LogOut size={15} /> Sign out other devices
+              </Button>
+              <Button variant="outline" size="sm" className="text-destructive" onClick={() => m.logoutAll.mutate()}
+                disabled={m.logoutAll.isPending}>
+                <LogOut size={15} /> Sign out everywhere
+              </Button>
+            </div>
           </div>
 
           {sessions.isLoading ? (
@@ -117,15 +124,15 @@ export default function SecurityPage() {
                 <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">{s.device ?? "Unknown device"}</p>
-                      {s.current && <Badge variant="success">This device</Badge>}
+                      <p className="text-sm font-medium">{s.deviceName ?? "Unknown device"}</p>
+                      {s.isCurrent && <Badge variant="success">This device</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {[s.ipAddress, s.lastActiveAt ? `Last active ${formatDateTime(s.lastActiveAt)}` : null]
+                      {[s.location ?? s.ipAddress, `Last active ${formatDateTime(s.lastUsedAtUtc)}`]
                         .filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {!s.current && (
+                  {!s.isCurrent && (
                     <Button size="sm" variant="ghost" className="text-destructive"
                       onClick={() => m.revoke.mutate(s.id)} disabled={m.revoke.isPending}>
                       Revoke
@@ -148,18 +155,17 @@ export default function SecurityPage() {
           ) : (
             <ul className="divide-y divide-border">
               {history.data.slice(0, 10).map((h, i) => (
-                <li key={h.id ?? i} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                <li key={i} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
                   <div>
-                    <p className="font-medium">{h.device ?? "Unknown device"}</p>
+                    <p className="font-medium">{h.deviceDescription ?? "Unknown device"}</p>
                     <p className="text-xs text-muted-foreground">
-                      {[h.ipAddress, formatDateTime(h.occurredAt)].filter(Boolean).join(" · ")}
+                      {[h.location ?? h.ipAddress, formatDateTime(h.createdAtUtc), h.failureReason]
+                        .filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {typeof h.succeeded === "boolean" && (
-                    <Badge variant={h.succeeded ? "muted" : "destructive"}>
-                      {h.succeeded ? "Success" : "Failed"}
-                    </Badge>
-                  )}
+                  <Badge variant={h.outcome === "Success" ? "muted" : "destructive"}>
+                    {h.outcome === "Success" ? "Success" : "Failed"}
+                  </Badge>
                 </li>
               ))}
             </ul>

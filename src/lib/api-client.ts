@@ -86,8 +86,12 @@ async function execute<T>(path: string, options: RequestOptions, isRetry = false
   const headers: Record<string, string> = {};
   if (!formData) headers["Content-Type"] = "application/json";
   if (auth) {
-    const token = useAuthStore.getState().accessToken;
-    if (token) headers.Authorization = `Bearer ${token}`;
+    const { accessToken, refreshToken } = useAuthStore.getState();
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    // Lets the backend identify "this device" on /account/sessions and
+    // /account/logout-other-devices (see AccountController.ResolveCurrentRefreshHash).
+    // Harmless on every other endpoint, which simply ignores it.
+    if (refreshToken) headers["X-Refresh-Token"] = refreshToken;
   }
 
   let res: Response;

@@ -10,14 +10,25 @@ export function useSessions() {
   const isAuth = useAuthStore((s) => s.isAuthenticated);
   return useQuery({ queryKey: qk.account.sessions, queryFn: () => accountApi.sessions(), enabled: isAuth });
 }
-export function useLoginHistory() {
+export function useLoginHistory(take?: number) {
   const isAuth = useAuthStore((s) => s.isAuthenticated);
-  return useQuery({ queryKey: qk.account.loginHistory, queryFn: () => accountApi.loginHistory(), enabled: isAuth });
+  return useQuery({
+    queryKey: qk.account.loginHistory,
+    queryFn: () => accountApi.loginHistory(take),
+    enabled: isAuth,
+  });
 }
 export function useChangePassword() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: ChangePasswordRequest) => accountApi.changePassword(body),
-    onSuccess: () => toast.success("Password changed"),
+    // The backend terminates every session (including this one) on a
+    // successful password change, so the local session is now dead too.
+    onSuccess: () => {
+      toast.success("Password changed. Please sign in again.");
+      useAuthStore.getState().clear();
+      qc.clear();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 }
@@ -29,5 +40,11 @@ export function useSessionMutations() {
       onSuccess: () => { invalidate(); toast.success("Session revoked"); }, onError: (e: Error) => toast.error(e.message) }),
     logoutOthers: useMutation({ mutationFn: () => accountApi.logoutOthers(),
       onSuccess: () => { invalidate(); toast.success("Signed out other devices"); }, onError: (e: Error) => toast.error(e.message) }),
+    logoutAll: useMutation({
+      mutationFn: () => accountApi.logoutAll(),
+      // This also revokes the current session, so drop it locally too.
+      onSuccess: () => { useAuthStore.getState().clear(); qc.clear(); toast.success("Signed out of all devices"); },
+      onError: (e: Error) => toast.error(e.message),
+    }),
   };
 }

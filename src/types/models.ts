@@ -271,19 +271,25 @@ export interface ActivityEntry {
 }
 
 /* ---------------------------- Sessions -------------------------------- */
+/** Mirrors SessionDto. */
 export interface UserSession {
   id: string;
-  device?: string;
-  ipAddress?: string;
-  lastActiveAt?: string;
-  current?: boolean;
-  // TODO confirm
+  deviceName: string | null;
+  ipAddress: string | null;
+  location: string | null;
+  createdAtUtc: string;
+  lastUsedAtUtc: string;
+  isCurrent: boolean;
 }
+
+export type LoginOutcome = "Success" | "InvalidCredentials" | "LockedOut" | "NotAllowed" | "EmailNotVerified";
+
+/** Mirrors LoginHistoryEntryDto. No stable id — key lists by index. */
 export interface LoginHistoryEntry {
-  id?: string;
-  ipAddress?: string;
-  device?: string;
-  succeeded?: boolean;
-  occurredAt?: string;
-  // TODO confirm
+  outcome: LoginOutcome;
+  ipAddress: string | null;
+  deviceDescription: string | null;
+  location: string | null;
+  createdAtUtc: string;
+  failureReason: string | null;
 }
