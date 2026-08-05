@@ -28,10 +28,7 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-/** Permission key regardless of which field the backend populates. */
-const permKey = (p: Permission) => p.key ?? p.name ?? "";
-const permLabel = (p: Permission) => p.name ?? p.key ?? "";
-const permGroup = (p: Permission) => p.group ?? p.category ?? permKey(p).split(".")[0] ?? "General";
+const permGroup = (p: Permission) => p.group;
 
 export default function AdminRolesPage() {
   return (
@@ -74,14 +71,21 @@ function RolesTab() {
   const openNew = () => { form.reset({ name: "", description: "" }); setSelectedPerms([]); setEditing("new"); };
   const openEdit = (r: Role) => {
     form.reset({ name: r.name, description: r.description ?? "" });
-    setSelectedPerms(r.permissions ?? []);
+    setSelectedPerms(r.permissions);
     setEditing(r);
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const body = { name: values.name, description: values.description || undefined, permissions: selectedPerms };
-    if (editing === "new") await m.create.mutateAsync(body);
-    else if (editing) await m.update.mutateAsync({ id: editing.id, body });
+    if (editing === "new") {
+      await m.create.mutateAsync({
+        name: values.name, description: values.description || undefined, permissions: selectedPerms,
+      });
+    } else if (editing) {
+      // Role names cannot be changed once created — only description/permissions.
+      await m.update.mutateAsync({
+        id: editing.id, body: { description: values.description || undefined, permissions: selectedPerms },
+      });
+    }
     setEditing(null);
   });
 
@@ -112,17 +116,17 @@ function RolesTab() {
                     <p className="truncate font-semibold">{r.name}</p>
                     {r.description && <p className="line-clamp-2 text-xs text-muted-foreground">{r.description}</p>}
                   </div>
-                  {r.isSystem && <Badge variant="muted">System</Badge>}
+                  {r.isSystemRole && <Badge variant="muted">System</Badge>}
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1">
-                  <Badge variant="outline">{r.permissions?.length ?? 0} permissions</Badge>
-                  {typeof r.userCount === "number" && <Badge variant="outline">{r.userCount} users</Badge>}
+                  <Badge variant="outline">{r.permissions.length} permissions</Badge>
+                  <Badge variant="outline">{r.userCount} users</Badge>
                 </div>
 
                 <div className="mt-4 flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEdit(r)}><Pencil size={14} /> Edit</Button>
-                  {!r.isSystem && (
+                  {!r.isSystemRole && (
                     <ConfirmDialog
                       trigger={<Button size="sm" variant="ghost" className="text-destructive"><Trash2 size={14} /></Button>}
                       title={`Delete the “${r.name}” role?`}
@@ -149,7 +153,11 @@ function RolesTab() {
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Role name" error={form.formState.errors.name?.message}>
-                <Input autoFocus placeholder="Store manager" {...form.register("name")} />
+                <Input autoFocus={editing === "new"} disabled={editing !== "new"}
+                  placeholder="Store manager" {...form.register("name")} />
+                {editing !== "new" && (
+                  <p className="text-xs text-muted-foreground">Names can&apos;t be changed after creation.</p>
+                )}
               </Field>
               <Field label="Description (optional)">
                 <Input placeholder="Runs day-to-day operations" {...form.register("description")} />
@@ -169,16 +177,15 @@ function RolesTab() {
                       <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</p>
                       <ul className="grid gap-1 sm:grid-cols-2">
                         {perms.map((p) => {
-                          const key = permKey(p);
-                          const checked = selectedPerms.includes(key);
+                          const checked = selectedPerms.includes(p.name);
                           return (
-                            <li key={key}>
+                            <li key={p.id}>
                               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 hover:bg-muted/50">
                                 <Checkbox checked={checked} className="mt-0.5"
                                   onCheckedChange={(v) => setSelectedPerms(
-                                    v ? [...selectedPerms, key] : selectedPerms.filter((k) => k !== key)
+                                    v ? [...selectedPerms, p.name] : selectedPerms.filter((k) => k !== p.name)
                                   )} />
-                                <span className="text-sm">{permLabel(p)}</span>
+                                <span className="text-sm">{p.name}</span>
                               </label>
                             </li>
                           );
@@ -205,24 +212,18 @@ function RolesTab() {
 
 function MatrixTab() {
   const { data, isLoading, isError, refetch } = usePermissionMatrix();
-  const { data: rolesFallback } = useRoles();
-  const { data: permsFallback } = usePermissionList();
 
   if (isLoading) return <LoadingState label="Loading permission matrix…" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
 
-  const roles = data?.roles ?? rolesFallback ?? [];
-  const permissions = data?.permissions ?? permsFallback ?? [];
-  const matrix = data?.matrix;
+  // rolePermissions is keyed by role NAME (not id) — that's the grain the
+  // backend's PermissionMatrixDto uses throughout.
+  const roleNames = Object.keys(data?.rolePermissions ?? {});
+  const permissions = Object.values(data?.permissionGroups ?? {}).flat();
+  const granted = (roleName: string, permissionName: string) =>
+    !!data?.rolePermissions[roleName]?.includes(permissionName);
 
-  /** A role grants a permission if the matrix says so, or the role lists it. */
-  const granted = (roleId: string, key: string) => {
-    if (matrix?.[roleId]) return matrix[roleId]!.includes(key);
-    const role = roles.find((r) => r.id === roleId);
-    return !!role?.permissions?.includes(key);
-  };
-
-  if (!roles.length || !permissions.length) {
+  if (!roleNames.length || !permissions.length) {
     return (
       <Card><CardContent className="p-5">
         <EmptyState icon={<ShieldCheck size={26} />} title="Matrix unavailable"
@@ -241,32 +242,29 @@ function MatrixTab() {
                 <th scope="col" className="sticky left-0 bg-card px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Permission
                 </th>
-                {roles.map((r) => (
-                  <th key={r.id} scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {r.name}
+                {roleNames.map((name) => (
+                  <th key={name} scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {name}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {permissions.map((p) => {
-                const key = permKey(p);
-                return (
-                  <tr key={key} className="border-b border-border last:border-0 hover:bg-muted/40">
-                    <th scope="row" className="sticky left-0 bg-card px-4 py-2.5 text-left font-medium">
-                      {permLabel(p)}
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">{permGroup(p)}</span>
-                    </th>
-                    {roles.map((r) => (
-                      <td key={r.id} className="px-4 py-2.5 text-center">
-                        {granted(r.id, key)
-                          ? <Check size={15} className="mx-auto text-success" aria-label="Granted" />
-                          : <span className="text-muted-foreground/40" aria-label="Not granted">—</span>}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
+              {permissions.map((p) => (
+                <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                  <th scope="row" className="sticky left-0 bg-card px-4 py-2.5 text-left font-medium">
+                    {p.name}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">{p.group}</span>
+                  </th>
+                  {roleNames.map((name) => (
+                    <td key={name} className="px-4 py-2.5 text-center">
+                      {granted(name, p.name)
+                        ? <Check size={15} className="mx-auto text-success" aria-label="Granted" />
+                        : <span className="text-muted-foreground/40" aria-label="Not granted">—</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

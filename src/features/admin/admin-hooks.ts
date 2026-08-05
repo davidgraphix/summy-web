@@ -122,7 +122,7 @@ export function useAdminCustomerDashboard(id: string) {
 export function useCustomerStatusMutation(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: T.UpdateStatusRequest) => adminCustomersApi.setStatus(id, body),
+    mutationFn: (p: { isActive: boolean; reason?: string }) => adminCustomersApi.setStatus(id, p.isActive, p.reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.admin.customers.all });
       toast.success("Customer status updated");
@@ -150,16 +150,18 @@ export function useUserMutations() {
       onSuccess: () => { refresh(); toast.success("User updated"); }, onError,
     }),
     setRoles: useMutation({
-      mutationFn: (p: { id: string; roleIds: string[] }) => adminUsersApi.setRoles(p.id, { roleIds: p.roleIds }),
+      mutationFn: (p: { id: string; roles: string[] }) => adminUsersApi.setRoles(p.id, { roles: p.roles }),
       onSuccess: () => { refresh(); toast.success("Roles updated"); }, onError,
     }),
     setStatus: useMutation({
-      mutationFn: (p: { id: string; body: T.UpdateStatusRequest }) => adminUsersApi.setStatus(p.id, p.body),
+      mutationFn: (p: { id: string; isActive: boolean }) => adminUsersApi.setStatus(p.id, p.isActive),
       onSuccess: () => { refresh(); toast.success("Status updated"); }, onError,
     }),
     resetPassword: useMutation({
-      mutationFn: (id: string) => adminUsersApi.resetPassword(id),
-      onSuccess: () => toast.success("Password reset email sent"), onError,
+      // Sets the password directly and terminates every existing session for that user.
+      mutationFn: (p: { id: string; newPassword: string }) =>
+        adminUsersApi.resetPassword(p.id, { newPassword: p.newPassword }),
+      onSuccess: () => toast.success("Password reset — the user's sessions have been signed out"), onError,
     }),
   };
 }
@@ -181,9 +183,9 @@ export function useRoleMutations() {
     qc.invalidateQueries({ queryKey: qk.admin.roles.matrix });
   };
   return {
-    create: useMutation({ mutationFn: (b: T.RoleRequest) => adminRolesApi.create(b),
+    create: useMutation({ mutationFn: (b: T.CreateRoleRequest) => adminRolesApi.create(b),
       onSuccess: () => { refresh(); toast.success("Role created"); }, onError }),
-    update: useMutation({ mutationFn: (p: { id: string; body: T.RoleRequest }) => adminRolesApi.update(p.id, p.body),
+    update: useMutation({ mutationFn: (p: { id: string; body: T.UpdateRoleRequest }) => adminRolesApi.update(p.id, p.body),
       onSuccess: () => { refresh(); toast.success("Role updated"); }, onError }),
     remove: useMutation({ mutationFn: (id: string) => adminRolesApi.remove(id),
       onSuccess: () => { refresh(); toast.success("Role deleted"); }, onError }),
@@ -347,7 +349,7 @@ export function useCategoryMutations() {
       onSuccess: () => { refresh(); toast.success("Category updated"); }, onError }),
     remove: useMutation({ mutationFn: (id: string) => adminCategoriesApi.remove(id),
       onSuccess: () => { refresh(); toast.success("Category deleted"); }, onError }),
-    setStatus: useMutation({ mutationFn: (p: { id: string; body: T.UpdateStatusRequest }) => adminCategoriesApi.setStatus(p.id, p.body),
+    setStatus: useMutation({ mutationFn: (p: { id: string; isActive: boolean }) => adminCategoriesApi.setStatus(p.id, p.isActive),
       onSuccess: () => { refresh(); toast.success("Category status updated"); }, onError }),
   };
 }
@@ -361,7 +363,7 @@ export function useBrandMutations() {
       onSuccess: () => { refresh(); toast.success("Brand updated"); }, onError }),
     remove: useMutation({ mutationFn: (id: string) => adminBrandsApi.remove(id),
       onSuccess: () => { refresh(); toast.success("Brand deleted"); }, onError }),
-    setStatus: useMutation({ mutationFn: (p: { id: string; body: T.UpdateStatusRequest }) => adminBrandsApi.setStatus(p.id, p.body),
+    setStatus: useMutation({ mutationFn: (p: { id: string; isActive: boolean }) => adminBrandsApi.setStatus(p.id, p.isActive),
       onSuccess: () => { refresh(); toast.success("Brand status updated"); }, onError }),
   };
 }

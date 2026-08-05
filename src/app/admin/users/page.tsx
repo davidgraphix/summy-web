@@ -32,7 +32,7 @@ const createSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "Use at least 8 characters").optional().or(z.literal("")),
+  password: z.string().min(8, "Use at least 8 characters"),
 });
 type CreateValues = z.infer<typeof createSchema>;
 
@@ -42,7 +42,9 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createRoles, setCreateRoles] = useState<string[]>([]);
   const [rolesFor, setRolesFor] = useState<AdminUser | null>(null);
+  const [resetFor, setResetFor] = useState<AdminUser | null>(null);
 
   const m = useUserMutations();
   const { data: roles } = useRoles();
@@ -60,25 +62,28 @@ export default function AdminUsersPage() {
   });
 
   const submitCreate = form.handleSubmit(async (values) => {
+    if (createRoles.length === 0) {
+      form.setError("root", { message: "Grant at least one role" });
+      return;
+    }
     await m.create.mutateAsync({
       firstName: values.firstName, lastName: values.lastName,
-      email: values.email, password: values.password || undefined,
+      email: values.email, password: values.password, roles: createRoles,
     });
     setCreateOpen(false);
+    setCreateRoles([]);
     form.reset();
   });
 
   const columns = useMemo<ColumnDef<AdminUser, unknown>[]>(() => [
     {
       id: "name", header: "Name",
-      accessorFn: (u) => u.fullName ?? ([u.firstName, u.lastName].filter(Boolean).join(" ") || u.email),
+      accessorFn: (u) => u.fullName,
       cell: ({ row }) => {
         const u = row.original;
         return (
           <div className="min-w-0">
-            <p className="truncate font-medium">
-              {u.fullName ?? ([u.firstName, u.lastName].filter(Boolean).join(" ") || u.email)}
-            </p>
+            <p className="truncate font-medium">{u.fullName}</p>
             <p className="truncate text-xs text-muted-foreground">{u.email}</p>
           </div>
         );
@@ -86,9 +91,9 @@ export default function AdminUsersPage() {
     },
     {
       id: "roles", header: "Roles", enableSorting: false,
-      accessorFn: (u) => (u.roleNames ?? u.roles ?? []).join(", "),
+      accessorFn: (u) => u.roles.join(", "),
       cell: ({ row }) => {
-        const list = row.original.roleNames ?? row.original.roles ?? [];
+        const list = row.original.roles;
         if (!list.length) return <span className="text-sm text-muted-foreground">No role</span>;
         return (
           <div className="flex flex-wrap gap-1">
@@ -98,21 +103,19 @@ export default function AdminUsersPage() {
       },
     },
     {
-      id: "lastLoginAt", header: "Last sign-in", accessorFn: (u) => u.lastLoginAt,
-      cell: ({ row }) => formatDateTime(row.original.lastLoginAt),
+      id: "lastLoginAtUtc", header: "Last sign-in", accessorFn: (u) => u.lastLoginAtUtc,
+      cell: ({ row }) => formatDateTime(row.original.lastLoginAtUtc),
     },
     {
       id: "status", header: "Status", enableSorting: false,
       accessorFn: (u) => u.status,
-      cell: ({ row }) => (
-        <StatusBadge status={row.original.status ?? (row.original.isActive === false ? "Disabled" : "Active")} />
-      ),
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
       id: "actions", header: "", enableSorting: false, enableHiding: false, size: 50,
       cell: ({ row }) => {
         const u = row.original;
-        const disabled = u.isActive === false || /disabled|suspend/i.test(u.status ?? "");
+        const disabled = u.status === "Suspended";
         return (
           <div className="flex justify-end">
             <DropdownMenu>
@@ -123,16 +126,7 @@ export default function AdminUsersPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setRolesFor(u)}><ShieldCheck size={14} /> Manage roles</DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()} asChild>
-                  <ConfirmDialog
-                    trigger={<button className="flex w-full items-center gap-2"><KeyRound size={14} /> Reset password</button>}
-                    title="Send a password reset?"
-                    description={`${u.email} will receive an email with instructions to set a new password.`}
-                    actionLabel="Send reset email" destructive={false}
-                    pending={m.resetPassword.isPending}
-                    onConfirm={() => m.resetPassword.mutateAsync(u.id)}
-                  />
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setResetFor(u)}><KeyRound size={14} /> Reset password</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem destructive={!disabled} onSelect={(e) => e.preventDefault()} asChild>
                   <ConfirmDialog
@@ -148,10 +142,7 @@ export default function AdminUsersPage() {
                     actionLabel={disabled ? "Enable" : "Disable"}
                     destructive={!disabled}
                     pending={m.setStatus.isPending}
-                    onConfirm={() => m.setStatus.mutateAsync({
-                      id: u.id,
-                      body: { status: disabled ? "Active" : "Disabled", isActive: disabled },
-                    })}
+                    onConfirm={() => m.setStatus.mutateAsync({ id: u.id, isActive: disabled })}
                   />
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -186,12 +177,12 @@ export default function AdminUsersPage() {
       />
 
       {/* Create user */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(v) => { setCreateOpen(v); if (!v) setCreateRoles([]); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite a team member</DialogTitle>
             <DialogDescription>
-              Leave the password blank to have the backend send them a set-up email.
+              The account is created already verified — share the password with them directly.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitCreate} className="space-y-3">
@@ -206,8 +197,25 @@ export default function AdminUsersPage() {
             <Field label="Email" error={form.formState.errors.email?.message}>
               <Input type="email" {...form.register("email")} />
             </Field>
-            <Field label="Temporary password (optional)" error={form.formState.errors.password?.message}>
+            <Field label="Temporary password" error={form.formState.errors.password?.message}>
               <Input type="password" placeholder="At least 8 characters" {...form.register("password")} />
+            </Field>
+            <Field label="Roles" error={form.formState.errors.root?.message}>
+              <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border p-2">
+                {(roles ?? []).map((r) => (
+                  <li key={r.id}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg p-1.5 text-sm hover:bg-muted/50">
+                      <Checkbox
+                        checked={createRoles.includes(r.name)}
+                        onCheckedChange={(v) =>
+                          setCreateRoles(v ? [...createRoles, r.name] : createRoles.filter((n) => n !== r.name))}
+                      />
+                      {r.name}
+                    </label>
+                  </li>
+                ))}
+                {!roles?.length && <li className="p-1.5 text-sm text-muted-foreground">No roles defined yet.</li>}
+              </ul>
             </Field>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -221,28 +229,32 @@ export default function AdminUsersPage() {
 
       {/* Manage roles */}
       <RolesDialog user={rolesFor} roles={roles ?? []} onClose={() => setRolesFor(null)}
-        onSave={(roleIds) => {
+        onSave={(names) => {
           if (!rolesFor) return;
-          m.setRoles.mutate({ id: rolesFor.id, roleIds }, { onSuccess: () => setRolesFor(null) });
+          m.setRoles.mutate({ id: rolesFor.id, roles: names }, { onSuccess: () => setRolesFor(null) });
         }}
         pending={m.setRoles.isPending} />
+
+      {/* Reset password */}
+      <ResetPasswordDialog user={resetFor} onClose={() => setResetFor(null)}
+        onSave={(newPassword) => {
+          if (!resetFor) return;
+          m.resetPassword.mutate({ id: resetFor.id, newPassword }, { onSuccess: () => setResetFor(null) });
+        }}
+        pending={m.resetPassword.isPending} />
     </>
   );
 }
 
 function RolesDialog({ user, roles, onClose, onSave, pending }: {
   user: AdminUser | null;
-  roles: { id: string; name: string; description?: string }[];
+  roles: { id: string; name: string; description?: string | null }[];
   onClose: () => void;
-  onSave: (roleIds: string[]) => void;
+  onSave: (roleNames: string[]) => void;
   pending?: boolean;
 }) {
-  // Existing assignments may arrive as names or ids; match on either.
-  const assigned = new Set([...(user?.roles ?? []), ...(user?.roleNames ?? [])]);
   const [selected, setSelected] = useState<string[]>([]);
-
-  const initial = roles.filter((r) => assigned.has(r.id) || assigned.has(r.name)).map((r) => r.id);
-  const current = selected.length || !user ? selected : initial;
+  const current = selected.length || !user ? selected : user.roles;
 
   return (
     <Dialog open={!!user} onOpenChange={(v) => { if (!v) { onClose(); setSelected([]); } }}>
@@ -261,13 +273,13 @@ function RolesDialog({ user, roles, onClose, onSave, pending }: {
         ) : (
           <ul className="max-h-72 space-y-1 overflow-y-auto">
             {roles.map((r) => {
-              const checked = current.includes(r.id);
+              const checked = current.includes(r.name);
               return (
                 <li key={r.id}>
                   <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50">
                     <Checkbox checked={checked} className="mt-0.5"
                       onCheckedChange={(v) =>
-                        setSelected(v ? [...current, r.id] : current.filter((id) => id !== r.id))} />
+                        setSelected(v ? [...current, r.name] : current.filter((name) => name !== r.name))} />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium">{r.name}</span>
                       {r.description && <span className="block text-xs text-muted-foreground">{r.description}</span>}
@@ -285,6 +297,42 @@ function RolesDialog({ user, roles, onClose, onSave, pending }: {
             {pending ? <><Spinner className="h-4 w-4" /> Saving…</> : "Save roles"}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const resetSchema = z.object({ newPassword: z.string().min(8, "Use at least 8 characters") });
+type ResetValues = z.infer<typeof resetSchema>;
+
+function ResetPasswordDialog({ user, onClose, onSave, pending }: {
+  user: AdminUser | null;
+  onClose: () => void;
+  onSave: (newPassword: string) => void;
+  pending?: boolean;
+}) {
+  const form = useForm<ResetValues>({ resolver: zodResolver(resetSchema), defaultValues: { newPassword: "" } });
+
+  return (
+    <Dialog open={!!user} onOpenChange={(v) => { if (!v) { onClose(); form.reset(); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset password</DialogTitle>
+          <DialogDescription>
+            Sets a new password for {user?.email} immediately and signs them out of every device.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit((v) => onSave(v.newPassword))} className="space-y-3">
+          <Field label="New password" error={form.formState.errors.newPassword?.message}>
+            <Input type="password" autoFocus placeholder="At least 8 characters" {...form.register("newPassword")} />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { onClose(); form.reset(); }}>Cancel</Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? <><Spinner className="h-4 w-4" /> Saving…</> : "Reset password"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

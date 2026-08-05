@@ -112,67 +112,139 @@ export interface AdminCustomerActivity {
 export type { Address };
 
 /* -------------------------------- Users -------------------------------- */
+/** Mirrors AdminUserDto. Note: only a combined fullName is returned, never firstName/lastName. */
 export interface AdminUser {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
-  fullName?: string;
-  status?: string;              // Active | Disabled — TODO confirm
-  isActive?: boolean;
-  roles?: string[];             // role names or ids — TODO confirm
-  roleNames?: string[];
-  lastLoginAt?: string;
-  createdAt?: string;
+  fullName: string;
+  phoneNumber: string | null;
+  userType: string;
+  status: string;
+  emailConfirmed: boolean;
+  roles: string[];
+  createdAtUtc: string;
+  lastLoginAtUtc: string | null;
 }
+/** Mirrors CreateAdminUserRequest. Roles are role *names*, not ids; at least one is required. */
 export interface CreateUserRequest {
-  email: string; firstName: string; lastName: string;
-  password?: string; roleIds?: string[];                                   // TODO confirm
+  email: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
+  password: string;
+  roles: string[];
 }
-export interface UpdateUserRequest { firstName?: string; lastName?: string; email?: string }
-export interface UpdateUserRolesRequest { roleIds: string[] }              // TODO confirm
-export interface UpdateStatusRequest { status?: string; isActive?: boolean } // TODO confirm
+/** Mirrors UpdateAdminUserRequest. */
+export interface UpdateUserRequest { firstName: string; lastName: string; phoneNumber?: string }
+/** Mirrors AssignRolesRequest — the complete desired role-name set; replaces, not merges. */
+export interface AssignRolesRequest { roles: string[] }
+/** Mirrors ResetAdminPasswordRequest. */
+export interface ResetAdminPasswordRequest { newPassword: string }
 
 /* -------------------------------- Roles -------------------------------- */
+/** Mirrors RoleDto. */
 export interface Role {
   id: string;
   name: string;
-  description?: string;
-  permissions?: string[];
-  userCount?: number;
-  isSystem?: boolean;
+  description: string | null;
+  isSystemRole: boolean;
+  permissions: string[];
+  userCount: number;
 }
+/** Mirrors PermissionDto. */
 export interface Permission {
-  // TODO: confirm — key/name/group naming on GET /admin/roles/permissions.
-  key?: string;
-  name?: string;
-  description?: string;
-  group?: string;
-  category?: string;
+  id: string;
+  name: string;
+  group: string;
+  description: string | null;
 }
+/** Mirrors PermissionMatrixDto. */
 export interface PermissionMatrix {
-  // GET /admin/roles/permission-matrix
-  roles?: Role[];
-  permissions?: Permission[];
-  matrix?: Record<string, string[]>;   // roleId -> permission keys — TODO confirm
-  [k: string]: unknown;
+  /** Grouped permission catalogue, keyed by group name. */
+  permissionGroups: Record<string, Permission[]>;
+  /** Role name -> the permission names it grants. */
+  rolePermissions: Record<string, string[]>;
 }
-export interface RoleRequest { name: string; description?: string; permissions?: string[] }
+/** Mirrors CreateRoleRequest. */
+export interface CreateRoleRequest { name: string; description?: string; permissions?: string[] }
+/** Mirrors UpdateRoleRequest — the complete desired permission set; replaces, not merges. */
+export interface UpdateRoleRequest { description?: string; permissions: string[] }
 
 /* ------------------------------- Settings ------------------------------ */
+/** Mirrors SystemSettingsDto — a single flat object, not grouped sub-objects. */
 export interface AdminSettings {
-  company?: CompanySettings;
-  contact?: ContactSettings;
-  social?: SocialSettings;
-  seo?: SeoSettings;
-  maintenance?: MaintenanceSettings;
-  [k: string]: unknown;
+  companyName: string;
+  legalName: string | null;
+  registrationNumber: string | null;
+  taxIdentificationNumber: string | null;
+  logoUrl: string | null;
+  supportEmail: string | null;
+  salesEmail: string | null;
+  primaryPhone: string | null;
+  secondaryPhone: string | null;
+  whatsAppNumber: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postalCode: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  twitterUrl: string | null;
+  linkedInUrl: string | null;
+  tikTokUrl: string | null;
+  youTubeUrl: string | null;
+  defaultMetaTitle: string | null;
+  defaultMetaDescription: string | null;
+  defaultMetaKeywords: string | null;
+  defaultOgImageUrl: string | null;
+  currencyCode: string;
+  currencySymbol: string;
+  maintenanceMode: boolean;
+  maintenanceMessage: string | null;
+  extraSettingsJson: string | null;
 }
-export interface CompanySettings { name?: string; registrationNumber?: string; logoUrl?: string; address?: string; currency?: string }
-export interface ContactSettings { email?: string; phone?: string; supportEmail?: string; whatsapp?: string; address?: string }
-export interface SocialSettings { facebook?: string; instagram?: string; twitter?: string; tiktok?: string; linkedin?: string; youtube?: string }
-export interface SeoSettings { metaTitle?: string; metaDescription?: string; metaKeywords?: string; ogImageUrl?: string }
-export interface MaintenanceSettings { enabled?: boolean; message?: string; allowedIps?: string }
+/** Mirrors UpdateCompanySettingsRequest. */
+export interface CompanySettings {
+  companyName: string;
+  legalName?: string;
+  registrationNumber?: string;
+  taxIdentificationNumber?: string;
+  logoUrl?: string;
+}
+/** Mirrors UpdateContactSettingsRequest. */
+export interface ContactSettings {
+  supportEmail?: string;
+  salesEmail?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  whatsAppNumber?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+}
+/** Mirrors UpdateSocialSettingsRequest. */
+export interface SocialSettings {
+  facebookUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  linkedInUrl?: string;
+  tikTokUrl?: string;
+  youTubeUrl?: string;
+}
+/** Mirrors UpdateSeoSettingsRequest. */
+export interface SeoSettings {
+  defaultMetaTitle?: string;
+  defaultMetaDescription?: string;
+  defaultMetaKeywords?: string;
+  defaultOgImageUrl?: string;
+}
+/** Mirrors UpdateMaintenanceRequest. */
+export interface MaintenanceSettings { enabled: boolean; message?: string }
 
 /* ------------------------------ Email logs ----------------------------- */
 export interface EmailLog {

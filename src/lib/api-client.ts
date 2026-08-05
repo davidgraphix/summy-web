@@ -106,7 +106,7 @@ async function execute<T>(path: string, options: RequestOptions, isRetry = false
     throw new ApiRequestError(
       e instanceof Error ? e.message : "Network request failed",
       0,
-      { code: "network_error", message: "Unable to reach the server. Check your connection." }
+      { code: "network_error", message: "Unable to reach the server. Check your connection.", validationErrors: [] }
     );
   }
 

@@ -55,8 +55,9 @@ export const adminCustomersApi = {
   addresses: (id: string) => api.get<T.Address[]>(`/admin/customers/${id}/addresses`),
   activity: (id: string) => api.get<T.AdminCustomerActivity[]>(`/admin/customers/${id}/activity`),
   dashboard: (id: string) => api.get<T.AdminCustomerDashboard>(`/admin/customers/${id}/dashboard`),
-  setStatus: (id: string, body: T.UpdateStatusRequest) =>
-    api.patch<T.AdminCustomerSummary>(`/admin/customers/${id}/status`, body),
+  // isActive/reason are query params — SetStatus takes no request body.
+  setStatus: (id: string, isActive: boolean, reason?: string) =>
+    api.patch<void>(`/admin/customers/${id}/status`, undefined, { params: { isActive, reason } }),
 };
 
 /* --------------------------------- Users -------------------------------- */
@@ -65,9 +66,12 @@ export const adminUsersApi = {
   byId: (id: string) => api.get<T.AdminUser>(`/admin/users/${id}`),
   create: (body: T.CreateUserRequest) => api.post<T.AdminUser>("/admin/users", body),
   update: (id: string, body: T.UpdateUserRequest) => api.put<T.AdminUser>(`/admin/users/${id}`, body),
-  setRoles: (id: string, body: T.UpdateUserRolesRequest) => api.put<T.AdminUser>(`/admin/users/${id}/roles`, body),
-  setStatus: (id: string, body: T.UpdateStatusRequest) => api.patch<T.AdminUser>(`/admin/users/${id}/status`, body),
-  resetPassword: (id: string) => api.post<unknown>(`/admin/users/${id}/reset-password`),
+  setRoles: (id: string, body: T.AssignRolesRequest) => api.put<T.AdminUser>(`/admin/users/${id}/roles`, body),
+  // isActive is a query param — SetStatus takes no request body.
+  setStatus: (id: string, isActive: boolean) =>
+    api.patch<void>(`/admin/users/${id}/status`, undefined, { params: { isActive } }),
+  resetPassword: (id: string, body: T.ResetAdminPasswordRequest) =>
+    api.post<void>(`/admin/users/${id}/reset-password`, body),
 };
 
 /* --------------------------------- Roles -------------------------------- */
@@ -76,8 +80,8 @@ export const adminRolesApi = {
   byId: (id: string) => api.get<T.Role>(`/admin/roles/${id}`),
   matrix: () => api.get<T.PermissionMatrix>("/admin/roles/permission-matrix"),
   permissions: () => api.get<T.Permission[]>("/admin/roles/permissions"),
-  create: (body: T.RoleRequest) => api.post<T.Role>("/admin/roles", body),
-  update: (id: string, body: T.RoleRequest) => api.put<T.Role>(`/admin/roles/${id}`, body),
+  create: (body: T.CreateRoleRequest) => api.post<T.Role>("/admin/roles", body),
+  update: (id: string, body: T.UpdateRoleRequest) => api.put<T.Role>(`/admin/roles/${id}`, body),
   remove: (id: string) => api.delete<void>(`/admin/roles/${id}`),
 };
 
@@ -156,7 +160,9 @@ export const adminCategoriesApi = {
   create: (body: T.CategoryRequest) => api.post<Category>("/categories", body),
   update: (id: string, body: T.CategoryRequest) => api.put<Category>(`/categories/${id}`, body),
   remove: (id: string) => api.delete<void>(`/categories/${id}`),
-  setStatus: (id: string, body: T.UpdateStatusRequest) => api.patch<Category>(`/categories/${id}/status`, body),
+  // isActive is a query param — SetStatus takes no request body.
+  setStatus: (id: string, isActive: boolean) =>
+    api.patch<void>(`/categories/${id}/status`, undefined, { params: { isActive } }),
 };
 
 /* --------------------------- Brands (write side) ------------------------ */
@@ -166,7 +172,9 @@ export const adminBrandsApi = {
   create: (body: T.BrandRequest) => api.post<Brand>("/brands", body),
   update: (id: string, body: T.BrandRequest) => api.put<Brand>(`/brands/${id}`, body),
   remove: (id: string) => api.delete<void>(`/brands/${id}`),
-  setStatus: (id: string, body: T.UpdateStatusRequest) => api.patch<Brand>(`/brands/${id}/status`, body),
+  // isActive is a query param — SetStatus takes no request body.
+  setStatus: (id: string, isActive: boolean) =>
+    api.patch<void>(`/brands/${id}/status`, undefined, { params: { isActive } }),
 };
 
 /* ---------------------------------- Media -------------------------------- */
