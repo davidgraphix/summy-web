@@ -40,9 +40,22 @@ function pickY(p: SeriesPoint, preferred?: string): number {
   return (candidates.find((v) => typeof v === "number") as number) ?? 0;
 }
 
-export function normalizeSeries(series: SeriesPoint[] | undefined, valueKey?: string) {
-  return (series ?? []).map((p) => ({ x: pickX(p), y: pickY(p, valueKey), raw: p }));
+
+function toSeriesArray(input: unknown): SeriesPoint[] {
+  if (Array.isArray(input)) return input as SeriesPoint[];
+  if (input && typeof input === "object") {
+    for (const key of ["items", "data", "results", "series", "points"]) {
+      const inner = (input as Record<string, unknown>)[key];
+      if (Array.isArray(inner)) return inner as SeriesPoint[];
+    }
+  }
+  return [];
 }
+
+export function normalizeSeries(series: unknown, valueKey?: string) {
+  return toSeriesArray(series).map((p) => ({ x: pickX(p), y: pickY(p, valueKey), raw: p }));
+}
+
 
 function ChartFrame({ title, subtitle, children, action, empty }: {
   title: string; subtitle?: string; children: React.ReactNode; action?: React.ReactNode; empty?: boolean;

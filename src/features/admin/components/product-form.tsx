@@ -49,27 +49,40 @@ function toDefaults(p?: AdminProduct): ProductFormValues {
   };
 }
 
-/** Strips empty optional values so we never send blank keys to the API. */
 export function toProductRequest(values: ProductFormValues): ProductRequest {
   const clean = <T,>(v: T | "" | undefined | null): T | undefined =>
     v === "" || v === undefined || v === null ? undefined : v;
+
   return {
     name: values.name,
     slug: clean(values.slug),
     sku: clean(values.sku),
-    description: clean(values.description),
-    price: values.price,
-    compareAtPrice: clean(values.compareAtPrice),
-    costPrice: clean(values.costPrice),
+
+    shortDescription: clean(values.description),
+
+    priceInKobo: Math.round(values.price * 100),
+
+    discountPriceInKobo:
+      clean(values.compareAtPrice) !== undefined
+        ? Math.round(values.compareAtPrice! * 100)
+        : undefined,
+
+    costPriceInKobo:
+      clean(values.costPrice) !== undefined
+        ? Math.round(values.costPrice! * 100)
+        : undefined,
+
     categoryId: clean(values.categoryId),
     brandId: clean(values.brandId),
+
     stockQuantity: values.stockQuantity,
     isFeatured: values.isFeatured,
-    metaTitle: clean(values.metaTitle),
-    metaDescription: clean(values.metaDescription),
+
     tags: parseTags(values.tagsText),
-    specifications: values.specifications?.filter((s) => s.name && s.value),
-    variants: values.variants?.filter((v) => v.name),
+
+    specifications: values.specifications?.filter(
+      (s) => s.name && s.value
+    ),
   };
 }
 

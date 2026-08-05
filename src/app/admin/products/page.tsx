@@ -23,10 +23,13 @@ import { useAdminProducts, useProductMutations } from "@/features/admin/admin-ho
 import { useCategories } from "@/features/categories/categories-hooks";
 import { useBrands } from "@/features/brands/brands-hooks";
 import { formatNaira } from "@/lib/format";
+import { asArray } from "@/lib/utils";
 import { productImage } from "@/features/products/product-image";
 import { API_ROOT } from "@/lib/env";
 import { adminCatalogApi, type AdminListQuery } from "@/features/admin/admin-api";
 import type { AdminProduct } from "@/features/admin/admin-types";
+
+import type { Brand, Category } from "@/types/models";
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -202,10 +205,10 @@ export default function AdminProductsPage() {
           <>
             <FilterSelect value={categoryId} onChange={(v) => { setCategoryId(v); setPage(1); }} label="Category"
               placeholder="All categories" width="w-[160px]"
-              options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))} />
+              options={asArray<Category>(categories).map((c) => ({ value: c.id, label: c.name }))} />
             <FilterSelect value={brandId} onChange={(v) => { setBrandId(v); setPage(1); }} label="Brand"
               placeholder="All brands" width="w-[150px]"
-              options={(brands ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+              options={asArray<Brand>(brands).map((b) => ({ value: b.id, label: b.name }))} />
             <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} label="Status"
               placeholder="Any status" width="w-[140px]"
               options={[{ value: "Published", label: "Published" }, { value: "Draft", label: "Draft" }]} />

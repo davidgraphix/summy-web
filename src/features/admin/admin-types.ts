@@ -256,23 +256,28 @@ export interface ProductVariant {
   attributes?: Record<string, string>;                                     // TODO confirm
 }
 export interface ProductRequest {
-  // POST/PUT /products — TODO: confirm the exact write model.
   name: string;
   slug?: string;
-  description?: string;
-  price: number;
-  compareAtPrice?: number | null;
-  costPrice?: number | null;
   sku?: string;
-  brandId?: string;
+
   categoryId?: string;
-  tags?: string[];
-  specifications?: Array<{ name: string; value: string }>;
-  variants?: ProductVariant[];
-  metaTitle?: string;
-  metaDescription?: string;
-  isFeatured?: boolean;
+  brandId?: string;
+
+  priceInKobo: number;
+  discountPriceInKobo?: number;
+  costPriceInKobo?: number;
+
+  shortDescription?: string;
+  fullDescription?: string;
+
   stockQuantity?: number;
+  isFeatured?: boolean;
+
+  tags?: string[];
+  specifications?: Array<{
+    name: string;
+    value: string;
+  }>;
 }
 
 /* ------------------------- Categories & Brands ------------------------- */

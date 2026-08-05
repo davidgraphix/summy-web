@@ -23,6 +23,8 @@ import {
 import { usePaymentsByOrder } from "@/features/payments/payments-hooks";
 import { formatNaira, formatDate, formatDateTime } from "@/lib/format";
 import { API_ROOT } from "@/lib/env";
+import { AdminUser } from "@/features/admin/admin-types";
+import { asArray } from "@/lib/utils";
 
 const ORDER_STATUSES = ["Pending", "Processing", "Paid", "Shipped", "Delivered", "Cancelled", "Refunded"];
 
@@ -263,7 +265,7 @@ function AssignCard({ value, onChange, onAssign, pending }: {
         <Select value={value} onValueChange={onChange}>
           <SelectTrigger><SelectValue placeholder="Select a team member" /></SelectTrigger>
           <SelectContent>
-            {(data?.items ?? []).map((u) => (
+          {asArray<AdminUser>(data?.items).map((u) => (
               <SelectItem key={u.id} value={u.id}>
                 {u.fullName ?? [u.firstName, u.lastName].filter(Boolean).join(" ") ?? u.email}
               </SelectItem>
