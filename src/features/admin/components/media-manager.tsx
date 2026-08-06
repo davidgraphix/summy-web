@@ -12,7 +12,7 @@ import { Hint } from "@/components/ui/tooltip";
 import { cld } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 import { useProductImages, useMediaMutations } from "../admin-hooks";
-import type { ProductImage } from "../admin-types";
+import type { Media } from "@/types/models";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -29,8 +29,8 @@ export function MediaManager({ productId, slug }: { productId: string; slug?: st
   const [dragId, setDragId] = useState<string | null>(null);
   const [order, setOrder] = useState<string[] | null>(null);
 
-  const list: ProductImage[] = order
-    ? (order.map((id) => images?.find((i) => i.id === id)).filter(Boolean) as ProductImage[])
+  const list: Media[] = order
+    ? (order.map((id) => images?.find((i) => i.id === id)).filter(Boolean) as Media[])
     : images ?? [];
 
   const accept = (files: FileList | null) => {
@@ -74,8 +74,8 @@ export function MediaManager({ productId, slug }: { productId: string; slug?: st
                 title="Remove all images?"
                 description="Every image on this product will be deleted. The product page will show a placeholder until you upload new ones."
                 actionLabel="Remove all" confirmText="DELETE"
-                pending={m.removeAll.isPending}
-                onConfirm={() => m.removeAll.mutateAsync()}
+                pending={m.removeMany.isPending}
+                onConfirm={() => m.removeMany.mutateAsync(list.map((i) => i.id))}
               />
             )}
           </div>
@@ -109,71 +109,68 @@ export function MediaManager({ productId, slug }: { productId: string; slug?: st
             description="Products with photos convert far better. Add at least one." />
         ) : (
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {list.map((img) => {
-              const featured = img.isFeatured ?? img.isPrimary;
-              return (
-                <li key={img.id} draggable
-                  onDragStart={() => setDragId(img.id)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => onDrop(img.id)}
-                  className={cn(
-                    "group relative overflow-hidden rounded-xl border bg-muted transition-shadow",
-                    featured ? "border-primary ring-2 ring-primary/25" : "border-border",
-                    dragId === img.id && "opacity-50"
-                  )}>
-                  <div className="aspect-square">
-                    <img src={cld.card(img.url)} alt={img.description ?? img.altText ?? ""}
-                      className="h-full w-full object-cover" />
-                  </div>
+            {list.map((img) => (
+              <li key={img.id} draggable
+                onDragStart={() => setDragId(img.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDrop(img.id)}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border bg-muted transition-shadow",
+                  img.isFeatured ? "border-primary ring-2 ring-primary/25" : "border-border",
+                  dragId === img.id && "opacity-50"
+                )}>
+                <div className="aspect-square">
+                  <img src={cld.card(img.secureUrl)} alt={img.altText ?? ""}
+                    className="h-full w-full object-cover" />
+                </div>
 
-                  <span className="absolute left-1.5 top-1.5 grid h-6 w-6 cursor-grab place-items-center rounded-md bg-foreground/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                    <GripVertical size={13} />
+                <span className="absolute left-1.5 top-1.5 grid h-6 w-6 cursor-grab place-items-center rounded-md bg-foreground/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  <GripVertical size={13} />
+                </span>
+
+                {img.isFeatured && (
+                  <span className="absolute right-1.5 top-1.5 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+                    Featured
                   </span>
+                )}
 
-                  {featured && (
-                    <span className="absolute right-1.5 top-1.5 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
-                      Featured
-                    </span>
+                <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-gradient-to-t from-foreground/80 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  {!img.isFeatured && (
+                    <Hint label="Set as featured">
+                      <button onClick={() => m.setFeatured.mutate(img.id)} aria-label="Set as featured image"
+                        className="grid h-7 w-7 place-items-center rounded-md bg-white/90 text-foreground hover:bg-white">
+                        <Star size={13} />
+                      </button>
+                    </Hint>
                   )}
+                  <ConfirmDialog
+                    trigger={
+                      <button aria-label="Delete image"
+                        className="ml-auto grid h-7 w-7 place-items-center rounded-md bg-white/90 text-destructive hover:bg-white">
+                        <Trash2 size={13} />
+                      </button>
+                    }
+                    title="Delete this image?"
+                    description="It will be removed from the product page immediately."
+                    actionLabel="Delete"
+                    pending={m.remove.isPending}
+                    onConfirm={() => m.remove.mutateAsync(img.id)}
+                  />
+                </div>
 
-                  <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-gradient-to-t from-foreground/80 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    {!featured && (
-                      <Hint label="Set as featured">
-                        <button onClick={() => m.setFeatured.mutate(img.id)} aria-label="Set as featured image"
-                          className="grid h-7 w-7 place-items-center rounded-md bg-white/90 text-foreground hover:bg-white">
-                          <Star size={13} />
-                        </button>
-                      </Hint>
-                    )}
-                    <ConfirmDialog
-                      trigger={
-                        <button aria-label="Delete image"
-                          className="ml-auto grid h-7 w-7 place-items-center rounded-md bg-white/90 text-destructive hover:bg-white">
-                          <Trash2 size={13} />
-                        </button>
+                <div className="border-t border-border bg-card p-1.5">
+                  <Input defaultValue={img.altText ?? ""}
+                    placeholder="Alt text…" aria-label="Image alt text"
+                    className="h-7 border-0 px-1 text-xs focus-visible:ring-0"
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (img.altText ?? "")) {
+                        m.setDescription.mutate({ imageId: img.id, altText: v });
                       }
-                      title="Delete this image?"
-                      description="It will be removed from the product page immediately."
-                      actionLabel="Delete"
-                      pending={m.remove.isPending}
-                      onConfirm={() => m.remove.mutateAsync(img.id)}
-                    />
-                  </div>
-
-                  <div className="border-t border-border bg-card p-1.5">
-                    <Input defaultValue={img.description ?? img.altText ?? ""}
-                      placeholder="Alt text…" aria-label="Image description"
-                      className="h-7 border-0 px-1 text-xs focus-visible:ring-0"
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v !== (img.description ?? img.altText ?? "")) {
-                          m.setDescription.mutate({ imageId: img.id, description: v });
-                        }
-                      }} />
-                  </div>
-                </li>
-              );
-            })}
+                    }} />
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </CardContent>

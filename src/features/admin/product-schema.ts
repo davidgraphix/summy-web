@@ -1,20 +1,29 @@
 import { z } from "zod";
 
 /**
- * Write model for POST/PUT /products. Optional fields stay optional so the
- * form never sends keys the backend doesn't expect.
+ * Write model for POST/PUT /products. Mirrors CreateProductRequest /
+ * UpdateProductRequest — the two are identical except UpdateProductRequest has
+ * no `stockQuantity` (stock is only ever set on create; afterwards it's
+ * managed exclusively through the Inventory endpoints, which keep an audit
+ * trail). Variants have no create/update DTO at all yet — the API only reads
+ * them back — so there's no variants field here.
  */
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   slug: z.string().optional(),
-  sku: z.string().optional(),
-  description: z.string().optional(),
+  sku: z.string().min(1, "SKU is required"),
+  shortDescription: z.string().optional(),
+  fullDescription: z.string().optional(),
   price: z.coerce.number().min(0, "Price can't be negative"),
-  compareAtPrice: z.coerce.number().min(0).optional().nullable(),
+  discountPrice: z.coerce.number().min(0).optional().nullable(),
   costPrice: z.coerce.number().min(0).optional().nullable(),
-  categoryId: z.string().optional(),
+  categoryId: z.string().min(1, "Category is required"),
   brandId: z.string().optional(),
+  /** Create-only — ignored by the form when editing. */
   stockQuantity: z.coerce.number().int().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  barcode: z.string().optional(),
+  weightGrams: z.coerce.number().int().min(0).optional(),
   isFeatured: z.boolean().optional(),
   metaTitle: z.string().max(70, "Keep under 70 characters for search results").optional(),
   metaDescription: z.string().max(160, "Keep under 160 characters for search results").optional(),
@@ -22,12 +31,6 @@ export const productSchema = z.object({
   specifications: z.array(z.object({
     name: z.string().min(1, "Required"),
     value: z.string().min(1, "Required"),
-  })).optional(),
-  variants: z.array(z.object({
-    name: z.string().min(1, "Required"),
-    sku: z.string().optional(),
-    price: z.coerce.number().min(0).optional(),
-    stockQuantity: z.coerce.number().int().min(0).optional(),
   })).optional(),
 });
 

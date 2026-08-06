@@ -15,81 +15,78 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCategories } from "@/features/categories/categories-hooks";
 import { useBrands } from "@/features/brands/brands-hooks";
+import { koboToNaira, nairaToKobo } from "@/lib/format";
 import { productSchema, parseTags, type ProductFormValues } from "../product-schema";
-import type { AdminProduct, ProductRequest } from "../admin-types";
+import type { ProductRequest } from "../admin-types";
+import type { Product } from "@/types/models";
 
 const NONE = "__none";
 
 /** Maps an existing product onto form defaults. */
-function toDefaults(p?: AdminProduct): ProductFormValues {
-  const specs = Array.isArray(p?.specifications)
-    ? p!.specifications
-    : p?.specifications
-      ? Object.entries(p.specifications).map(([name, value]) => ({ name, value: String(value) }))
-      : [];
+function toDefaults(p?: Product): ProductFormValues {
   return {
     name: p?.name ?? "",
     slug: p?.slug ?? "",
     sku: p?.sku ?? "",
-    description: p?.description ?? "",
-    price: p?.price ?? 0,
-    compareAtPrice: p?.compareAtPrice ?? undefined,
-    costPrice: p?.costPrice ?? undefined,
+    shortDescription: p?.shortDescription ?? "",
+    fullDescription: p?.fullDescription ?? "",
+    price: p ? koboToNaira(p.price.kobo) : 0,
+    discountPrice: p?.discountPrice ? koboToNaira(p.discountPrice.kobo) : undefined,
+    // Cost price is write-only — the read DTO never returns it, so this always starts blank on edit.
+    costPrice: undefined,
     categoryId: p?.category?.id ?? "",
     brandId: p?.brand?.id ?? "",
-    stockQuantity: p?.stockQuantity ?? 0,
+    stockQuantity: p ? undefined : 0,
+    lowStockThreshold: p?.lowStockThreshold,
+    barcode: p?.barcode ?? "",
+    weightGrams: p?.weightGrams ?? undefined,
     isFeatured: p?.isFeatured ?? false,
-    metaTitle: p?.metaTitle ?? "",
-    metaDescription: p?.metaDescription ?? "",
-    tagsText: p?.tags?.join(", ") ?? "",
-    specifications: specs,
-    variants: p?.variants?.map((v) => ({
-      name: v.name ?? "", sku: v.sku ?? "", price: v.price ?? 0, stockQuantity: v.stockQuantity ?? 0,
-    })) ?? [],
+    metaTitle: p?.seo.metaTitle ?? "",
+    metaDescription: p?.seo.metaDescription ?? "",
+    tagsText: p?.tags.join(", ") ?? "",
+    specifications: p?.specifications.map((s) => ({ name: s.name, value: s.value })) ?? [],
   };
 }
 
-export function toProductRequest(values: ProductFormValues): ProductRequest {
+export function toProductRequest(values: ProductFormValues, isEdit: boolean): ProductRequest {
   const clean = <T,>(v: T | "" | undefined | null): T | undefined =>
     v === "" || v === undefined || v === null ? undefined : v;
 
   return {
     name: values.name,
     slug: clean(values.slug),
-    sku: clean(values.sku),
-
-    shortDescription: clean(values.description),
-
-    priceInKobo: Math.round(values.price * 100),
-
-    discountPriceInKobo:
-      clean(values.compareAtPrice) !== undefined
-        ? Math.round(values.compareAtPrice! * 100)
-        : undefined,
-
-    costPriceInKobo:
-      clean(values.costPrice) !== undefined
-        ? Math.round(values.costPrice! * 100)
-        : undefined,
-
-    categoryId: clean(values.categoryId),
+    sku: values.sku,
+    categoryId: values.categoryId,
     brandId: clean(values.brandId),
 
-    stockQuantity: values.stockQuantity,
+    shortDescription: clean(values.shortDescription),
+    fullDescription: clean(values.fullDescription),
+
+    priceInKobo: nairaToKobo(values.price),
+    discountPriceInKobo: clean(values.discountPrice) !== undefined ? nairaToKobo(values.discountPrice!) : undefined,
+    costPriceInKobo: clean(values.costPrice) !== undefined ? nairaToKobo(values.costPrice!) : undefined,
+
+    // Stock is create-only — UpdateProductRequest has no such field.
+    stockQuantity: isEdit ? undefined : values.stockQuantity,
+    lowStockThreshold: values.lowStockThreshold,
+    barcode: clean(values.barcode),
+    weightGrams: values.weightGrams,
     isFeatured: values.isFeatured,
+
+    seo: { metaTitle: clean(values.metaTitle) ?? null, metaDescription: clean(values.metaDescription) ?? null, metaKeywords: null, canonicalUrl: null },
 
     tags: parseTags(values.tagsText),
 
-    specifications: values.specifications?.filter(
-      (s) => s.name && s.value
-    ),
+    specifications: values.specifications
+      ?.filter((s) => s.name && s.value)
+      .map((s, i) => ({ name: s.name, value: s.value, group: null, displayOrder: i })),
   };
 }
 
 export function ProductForm({
   product, onSubmit, submitting, footer, onDirtyChange,
 }: {
-  product?: AdminProduct;
+  product?: Product;
   onSubmit: (values: ProductFormValues) => void | Promise<unknown>;
   submitting?: boolean;
   footer?: React.ReactNode;
@@ -108,7 +105,6 @@ export function ProductForm({
   useEffect(() => { onDirtyChange?.(form.formState.isDirty); }, [form.formState.isDirty, onDirtyChange]);
 
   const specs = useFieldArray({ control: form.control, name: "specifications" });
-  const variants = useFieldArray({ control: form.control, name: "variants" });
   const e = form.formState.errors;
 
   return (
@@ -118,7 +114,6 @@ export function ProductForm({
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="pricing">Pricing &amp; stock</TabsTrigger>
           <TabsTrigger value="specs">Specifications</TabsTrigger>
-          <TabsTrigger value="variants">Variants</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
         </TabsList>
 
@@ -131,22 +126,22 @@ export function ProductForm({
             <Field label="URL slug (optional)" error={e.slug?.message}>
               <Input placeholder="lg-55-uhd-smart-tv" {...form.register("slug")} />
             </Field>
-            <Field label="SKU (optional)" error={e.sku?.message}>
+            <Field label="SKU" error={e.sku?.message}>
               <Input placeholder="LG-UHD-55" {...form.register("sku")} />
             </Field>
 
-            <Field label="Category" className="sm:col-span-1">
+            <Field label="Category" error={e.categoryId?.message}>
               <Select value={form.watch("categoryId") || NONE}
                 onValueChange={(v) => form.setValue("categoryId", v === NONE ? "" : v, { shouldDirty: true })}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>No category</SelectItem>
+                  <SelectItem value={NONE} disabled>Select category</SelectItem>
                   {categories?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field label="Brand">
+            <Field label="Brand (optional)">
               <Select value={form.watch("brandId") || NONE}
                 onValueChange={(v) => form.setValue("brandId", v === NONE ? "" : v, { shouldDirty: true })}>
                 <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
@@ -157,8 +152,12 @@ export function ProductForm({
               </Select>
             </Field>
 
-            <Field label="Description" error={e.description?.message} className="sm:col-span-2">
-              <Textarea rows={6} placeholder="What makes this product worth buying?" {...form.register("description")} />
+            <Field label="Short description (optional)" error={e.shortDescription?.message} className="sm:col-span-2">
+              <Input placeholder="One-line summary shown on listings" {...form.register("shortDescription")} />
+            </Field>
+
+            <Field label="Full description" error={e.fullDescription?.message} className="sm:col-span-2">
+              <Textarea rows={6} placeholder="What makes this product worth buying?" {...form.register("fullDescription")} />
             </Field>
 
             <Field label="Tags (comma separated)" error={e.tagsText?.message} className="sm:col-span-2">
@@ -182,19 +181,30 @@ export function ProductForm({
             <Field label="Price (₦)" error={e.price?.message}>
               <Input type="number" min={0} step="1" {...form.register("price")} />
             </Field>
-            <Field label="Compare-at price (₦)" error={e.compareAtPrice?.message}>
-              <Input type="number" min={0} step="1" placeholder="Optional" {...form.register("compareAtPrice")} />
+            <Field label="Discount price (₦)" error={e.discountPrice?.message}>
+              <Input type="number" min={0} step="1" placeholder="Optional" {...form.register("discountPrice")} />
             </Field>
             <Field label="Cost price (₦)" error={e.costPrice?.message}>
-              <Input type="number" min={0} step="1" placeholder="Optional" {...form.register("costPrice")} />
+              <Input type="number" min={0} step="1" placeholder="Optional — never shown back" {...form.register("costPrice")} />
             </Field>
-            <Field label="Stock quantity" error={e.stockQuantity?.message}>
-              <Input type="number" min={0} step="1" {...form.register("stockQuantity")} />
+            {product ? (
+              <p className="text-xs text-muted-foreground sm:col-span-3">
+                Stock is managed from the Inventory tab, which keeps an audit history — it can&apos;t be changed here.
+              </p>
+            ) : (
+              <Field label="Initial stock quantity" error={e.stockQuantity?.message}>
+                <Input type="number" min={0} step="1" {...form.register("stockQuantity")} />
+              </Field>
+            )}
+            <Field label="Low stock threshold" error={e.lowStockThreshold?.message}>
+              <Input type="number" min={0} step="1" placeholder="5" {...form.register("lowStockThreshold")} />
             </Field>
-            <p className="text-xs text-muted-foreground sm:col-span-3">
-              Setting a compare-at price above the price shows a discount badge on the storefront.
-              For ongoing stock movements use the Inventory tab, which keeps an audit history.
-            </p>
+            <Field label="Barcode (optional)">
+              <Input {...form.register("barcode")} />
+            </Field>
+            <Field label="Weight (grams, optional)">
+              <Input type="number" min={0} step="1" {...form.register("weightGrams")} />
+            </Field>
           </CardContent></Card>
         </TabsContent>
 
@@ -225,34 +235,6 @@ export function ProductForm({
           </CardContent></Card>
         </TabsContent>
 
-        {/* ---------------- Variants ---------------- */}
-        <TabsContent value="variants">
-          <Card><CardContent className="space-y-3 p-5">
-            <p className="text-sm text-muted-foreground">
-              Variants let customers choose between options such as size or colour.
-            </p>
-            {variants.fields.length === 0 && (
-              <p className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
-                No variants — this product is sold as a single option.
-              </p>
-            )}
-            {variants.fields.map((f, i) => (
-              <div key={f.id} className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-                <Input placeholder="Variant name" {...form.register(`variants.${i}.name`)} />
-                <Input placeholder="SKU" {...form.register(`variants.${i}.sku`)} />
-                <Input type="number" min={0} placeholder="Price" {...form.register(`variants.${i}.price`)} />
-                <Input type="number" min={0} placeholder="Stock" {...form.register(`variants.${i}.stockQuantity`)} />
-                <Button type="button" variant="ghost" size="icon" onClick={() => variants.remove(i)}
-                  aria-label="Remove variant" className="text-destructive"><Trash2 size={16} /></Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm"
-              onClick={() => variants.append({ name: "", sku: "", price: 0, stockQuantity: 0 })}>
-              <Plus size={15} /> Add variant
-            </Button>
-          </CardContent></Card>
-        </TabsContent>
-
         {/* ---------------- SEO ---------------- */}
         <TabsContent value="seo">
           <Card><CardContent className="grid gap-4 p-5">
@@ -273,7 +255,7 @@ export function ProductForm({
                 summysolutions.com/products/{form.watch("slug") || "product-slug"}
               </p>
               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                {form.watch("metaDescription") || form.watch("description") || "Add a description to control how this looks in search results."}
+                {form.watch("metaDescription") || form.watch("shortDescription") || "Add a description to control how this looks in search results."}
               </p>
             </div>
           </CardContent></Card>
