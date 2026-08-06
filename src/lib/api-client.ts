@@ -152,3 +152,28 @@ export const api = {
   postForm: <T>(path: string, formData: FormData, opts?: Omit<RequestOptions, "method" | "body" | "formData">) =>
     execute<T>(path, { ...opts, method: "POST", formData }),
 };
+
+/**
+ * Downloads a file from an authenticated endpoint (e.g. invoice/receipt PDFs)
+ * and saves it via the browser. Plain `<a href>` tags can't attach the bearer
+ * token, so those endpoints 401 unless fetched like this.
+ */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const token = useAuthStore.getState().accessToken;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(buildUrl(path), { headers });
+  if (!res.ok) {
+    throw new ApiRequestError(`Download failed (${res.status})`, res.status, null);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

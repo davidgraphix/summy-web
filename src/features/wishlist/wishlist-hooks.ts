@@ -18,5 +18,7 @@ export function useWishlistMutations() {
       onSuccess: () => { invalidate(); toast.success("Saved to wishlist"); }, onError: (e: Error) => toast.error(e.message) }),
     remove: useMutation({ mutationFn: (id: string) => wishlistApi.remove(id),
       onSuccess: () => { invalidate(); toast.success("Removed from wishlist"); }, onError: (e: Error) => toast.error(e.message) }),
+    clear: useMutation({ mutationFn: () => wishlistApi.clear(),
+      onSuccess: () => { invalidate(); toast.success("Wishlist cleared"); }, onError: (e: Error) => toast.error(e.message) }),
   };
 }
