@@ -13,7 +13,7 @@ export default function NotificationsPage() {
   const unread = useUnreadCount();
   const m = useNotificationMutations();
 
-  const unreadCount = unread.data?.count ?? 0;
+  const unreadCount = unread.data?.unreadCount ?? 0;
   const items = data?.items ?? [];
 
   if (isLoading) return <LoadingState label="Loading notifications…" />;
@@ -46,7 +46,7 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {items.map((n) => {
-            const isUnread = n.isRead === false;
+            const isUnread = !n.isRead;
             return (
               <Card key={n.id} className={cn(isUnread && "border-primary/30 bg-primary/[0.03]")}>
                 <CardContent className="flex gap-3 p-4">
@@ -54,11 +54,11 @@ export default function NotificationsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <p className={cn("text-sm", isUnread ? "font-bold" : "font-medium")}>
-                        {n.title ?? "Notification"}
+                        {n.title}
                       </p>
-                      <span className="text-xs text-muted-foreground">{formatDateTime(n.createdAt)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDateTime(n.createdAtUtc)}</span>
                     </div>
-                    {n.message && <p className="mt-0.5 text-sm text-muted-foreground">{n.message}</p>}
+                    <p className="mt-0.5 text-sm text-muted-foreground">{n.message}</p>
                     {isUnread && (
                       <button onClick={() => m.markRead.mutate(n.id)} disabled={m.markRead.isPending}
                         className="mt-2 text-xs font-semibold text-primary hover:underline disabled:opacity-50">

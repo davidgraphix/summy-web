@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Heart, Package, Wallet } from "lucide-react";
+import { Activity, Heart, Package, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/states";
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge";
-import { formatNaira, formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useDashboard, useActivity, useProfile } from "@/features/customer/customer-hooks";
 import { useOrders } from "@/features/orders/orders-hooks";
 
@@ -14,11 +14,11 @@ export default function DashboardPage() {
   const { data: profile } = useProfile();
   const { data: overview, isLoading, isError, refetch } = useDashboard();
   const { data: activity } = useActivity();
-  // Fall back to the orders list if the dashboard DTO doesn't embed recent orders.
-  const orders = useOrders(1);
+  // CustomerDashboardDto has no recent-orders list — pull the first page separately.
+  const orders = useOrders({ pageNumber: 1, pageSize: 5 });
 
-  const greetingName = profile?.firstName ?? profile?.fullName ?? "there";
-  const recentOrders = overview?.recentOrders ?? orders.data?.items ?? [];
+  const greetingName = profile?.firstName ?? "there";
+  const recentOrders = orders.data?.items ?? [];
 
   if (isLoading) return <LoadingState label="Loading your dashboard…" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
@@ -33,12 +33,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat icon={<Package size={18} />} label="Orders"
           value={overview?.orderCount ?? orders.data?.totalCount ?? 0} />
-        <Stat icon={<Wallet size={18} />} label="Total spent"
-          value={typeof overview?.totalSpent === "number" ? formatNaira(overview.totalSpent) : "—"} />
         <Stat icon={<Heart size={18} />} label="Wishlist"
           value={overview?.wishlistCount ?? "—"} />
         <Stat icon={<Activity size={18} />} label="Unread alerts"
-          value={overview?.unreadNotifications ?? "—"} />
+          value={overview?.unreadNotificationCount ?? "—"} />
+        <Stat icon={<Users size={18} />} label="Referrals"
+          value={overview?.referralCount ?? "—"} />
       </div>
 
       <Card>
@@ -57,17 +57,17 @@ export default function DashboardPage() {
             />
           ) : (
             <ul className="divide-y divide-border">
-              {recentOrders.slice(0, 5).map((o) => (
+              {recentOrders.map((o) => (
                 <li key={o.id}>
                   <Link href={`/dashboard/orders/${o.id}`}
                     className="flex flex-wrap items-center justify-between gap-2 py-3 transition-colors hover:text-primary">
                     <div>
-                      <p className="font-semibold">{o.orderNumber ? `#${o.orderNumber}` : `Order ${o.id.slice(0, 8)}`}</p>
-                      <p className="text-sm text-muted-foreground">{formatDate(o.createdAt)}</p>
+                      <p className="font-semibold">#{o.orderNumber}</p>
+                      <p className="text-sm text-muted-foreground">{formatDate(o.placedAtUtc)}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <OrderStatusBadge status={o.status} />
-                      <span className="font-bold">{formatNaira(o.total)}</span>
+                      <span className="font-bold">{o.totalFormatted}</span>
                     </div>
                   </Link>
                 </li>
@@ -77,17 +77,17 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {!!activity?.length && (
+      {!!activity?.items.length && (
         <Card>
           <CardContent className="p-5">
             <h2 className="mb-4 text-lg font-bold">Recent activity</h2>
             <ul className="space-y-3">
-              {activity.slice(0, 8).map((a, i) => (
-                <li key={a.id ?? i} className="flex gap-3 text-sm">
+              {activity.items.slice(0, 8).map((a) => (
+                <li key={a.id} className="flex gap-3 text-sm">
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
                   <div>
-                    <p className="font-medium">{a.description ?? a.type ?? "Activity"}</p>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAt)}</p>
+                    <p className="font-medium">{a.description}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAtUtc)}</p>
                   </div>
                 </li>
               ))}

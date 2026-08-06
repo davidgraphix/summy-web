@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/states";
-import { formatNaira, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { useReferrals, useReferralSummary } from "@/features/referrals/referrals-hooks";
 import { toast } from "sonner";
 
@@ -78,10 +78,8 @@ export default function ReferralsPage() {
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="mb-2 grid h-9 w-9 place-items-center rounded-xl bg-accent/10 text-accent"><Gift size={18} /></div>
-          <p className="text-xs text-muted-foreground">Rewards earned</p>
-          <p className="mt-0.5 text-xl font-extrabold">
-            {typeof summary.data?.totalRewards === "number" ? formatNaira(summary.data.totalRewards) : "—"}
-          </p>
+          <p className="text-xs text-muted-foreground">Qualified referrals</p>
+          <p className="mt-0.5 text-xl font-extrabold">{summary.data?.qualifiedReferrals ?? 0}</p>
         </CardContent></Card>
       </div>
 
@@ -90,7 +88,7 @@ export default function ReferralsPage() {
           <h2 className="mb-4 text-lg font-bold">Your referrals</h2>
           {list.isLoading ? (
             <LoadingState />
-          ) : !list.data?.length ? (
+          ) : !list.data?.items.length ? (
             <EmptyState
               icon={<Users size={28} />}
               title="No referrals yet"
@@ -98,15 +96,15 @@ export default function ReferralsPage() {
             />
           ) : (
             <ul className="divide-y divide-border">
-              {list.data.map((r) => (
+              {list.data.items.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                   <div>
-                    <p className="text-sm font-medium">{r.refereeName ?? "Referred friend"}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(r.createdAt)}</p>
+                    <p className="text-sm font-medium">{r.referredCustomerName}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(r.referredAtUtc)}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    {r.status && <Badge variant="muted">{r.status}</Badge>}
-                    {typeof r.reward === "number" && <span className="text-sm font-bold">{formatNaira(r.reward)}</span>}
+                    <Badge variant="muted">{r.status}</Badge>
+                    {r.rewardAmountFormatted && <span className="text-sm font-bold">{r.rewardAmountFormatted}</span>}
                   </div>
                 </li>
               ))}

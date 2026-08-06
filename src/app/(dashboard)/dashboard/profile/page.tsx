@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { BadgeCheck, Camera, User } from "lucide-react";
+import { BadgeCheck, Camera, Trash2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/shared/field";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState, LoadingState } from "@/components/shared/states";
-import { useProfile, useUpdateProfile, useUploadAvatar } from "@/features/customer/customer-hooks";
+import { useProfile, useUpdateProfile, useUploadAvatar, useRemoveAvatar } from "@/features/customer/customer-hooks";
 import { toast } from "sonner";
 
 const profileSchema = z.object({
@@ -28,6 +28,7 @@ export default function ProfilePage() {
   const { data: profile, isLoading, isError, refetch } = useProfile();
   const update = useUpdateProfile();
   const upload = useUploadAvatar();
+  const removeAvatar = useRemoveAvatar();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileValues>({
@@ -60,9 +61,7 @@ export default function ProfilePage() {
   if (isLoading) return <LoadingState label="Loading your profile…" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
 
-  const displayName = profile?.fullName
-    ?? [profile?.firstName, profile?.lastName].filter(Boolean).join(" ")
-    ?? "Your account";
+  const displayName = profile?.fullName ?? "Your account";
 
   return (
     <div className="space-y-5">
@@ -75,8 +74,8 @@ export default function ProfilePage() {
         <CardContent className="flex flex-wrap items-center gap-4 p-5">
           <div className="relative">
             <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-muted text-muted-foreground/50">
-              {profile?.avatarUrl
-                ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+              {profile?.profilePictureUrl
+                ? <img src={profile.profilePictureUrl} alt="" className="h-full w-full object-cover" />
                 : <User size={32} />}
             </div>
             <button onClick={() => fileInput.current?.click()} disabled={upload.isPending}
@@ -87,15 +86,22 @@ export default function ProfilePage() {
             <input ref={fileInput} type="file" accept="image/*" onChange={onPickFile} className="hidden" />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-lg font-bold">{displayName}</p>
-              {profile?.emailVerified && (
+              {profile?.emailConfirmed && (
                 <Badge variant="success"><BadgeCheck size={13} /> Verified</Badge>
               )}
             </div>
             <p className="truncate text-sm text-muted-foreground">{profile?.email}</p>
           </div>
+
+          {profile?.profilePictureUrl && (
+            <Button variant="ghost" size="sm" className="text-destructive" disabled={removeAvatar.isPending}
+              onClick={() => removeAvatar.mutate()}>
+              {removeAvatar.isPending ? <Spinner className="h-4 w-4" /> : <Trash2 size={14} />} Remove photo
+            </Button>
+          )}
         </CardContent>
       </Card>
 

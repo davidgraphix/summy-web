@@ -27,7 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const logout = useLogout();
   const unread = useUnreadCount();
-  const unreadCount = unread.data?.count ?? 0;
+  const unreadCount = unread.data?.unreadCount ?? 0;
 
   return (
     <div className="min-h-screen">

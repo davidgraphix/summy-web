@@ -8,12 +8,12 @@ import { buttonVariants } from "@/components/ui/button";
 import { Pagination } from "@/components/shared/pagination";
 import { EmptyState, ErrorState, LoadingState } from "@/components/shared/states";
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge";
-import { formatNaira, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { useOrders } from "@/features/orders/orders-hooks";
 
 export default function OrdersPage() {
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, refetch } = useOrders(page);
+  const { data, isLoading, isError, refetch } = useOrders({ pageNumber: page });
 
   return (
     <div className="space-y-5">
@@ -46,17 +46,14 @@ export default function OrdersPage() {
                   <Link href={`/dashboard/orders/${o.id}`} className="group flex items-center gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-bold group-hover:text-primary">
-                          {o.orderNumber ? `#${o.orderNumber}` : `Order ${o.id.slice(0, 8)}`}
-                        </p>
+                        <p className="font-bold group-hover:text-primary">#{o.orderNumber}</p>
                         <OrderStatusBadge status={o.status} />
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {formatDate(o.createdAt)}
-                        {o.items?.length ? ` · ${o.items.length} ${o.items.length === 1 ? "item" : "items"}` : ""}
+                        {formatDate(o.placedAtUtc)} · {o.itemCount} {o.itemCount === 1 ? "item" : "items"}
                       </p>
                     </div>
-                    <span className="font-extrabold">{formatNaira(o.total)}</span>
+                    <span className="font-extrabold">{o.totalFormatted}</span>
                     <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
                   </Link>
                 </CardContent>
