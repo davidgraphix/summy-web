@@ -43,7 +43,7 @@ export default function AdminCategoriesPage() {
 
   const openNew = () => { form.reset({ name: "", slug: "", description: "", parentId: "" }); setEditing("new"); };
   const openEdit = (c: Category) => {
-    form.reset({ name: c.name, slug: c.slug ?? "", description: "", parentId: c.parentId ?? "" });
+    form.reset({ name: c.name, slug: c.slug, description: c.description ?? "", parentId: c.parentId ?? "" });
     setEditing(c);
   };
 
@@ -86,7 +86,7 @@ export default function AdminCategoriesPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{c.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">/{c.slug ?? c.id.slice(0, 8)}</p>
+                      <p className="truncate text-xs text-muted-foreground">/{c.slug}</p>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -112,9 +112,6 @@ export default function AdminCategoriesPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  {typeof c.productCount === "number" && (
-                    <p className="mt-3 text-xs text-muted-foreground">{c.productCount} products</p>
-                  )}
                 </CardContent>
               </Card>
             ))}

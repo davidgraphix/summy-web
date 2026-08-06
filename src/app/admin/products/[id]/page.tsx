@@ -26,10 +26,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   if (isLoading) return <LoadingState label="Loading product…" />;
   if (isError || !product) return <ErrorState onRetry={() => refetch()} />;
 
-  const published = product.isPublished ?? (product.status ? /publish|active|live/i.test(product.status) : false);
+  const published = product.isPublished;
 
   const onSubmit = async (values: ProductFormValues) => {
-    await m.update.mutateAsync({ id, body: toProductRequest(values) });
+    await m.update.mutateAsync({ id, body: toProductRequest(values, true) });
     setDirty(false);
   };
 
@@ -37,7 +37,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     <>
       <PageHeader
         title={product.name}
-        description={product.sku ? `SKU ${product.sku}` : undefined}
+        description={`SKU ${product.sku}`}
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: "Products", href: "/admin/products" },
@@ -45,12 +45,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         ]}
         actions={
           <>
-            {product.slug && (
-              <a href={`/products/${product.slug}`} target="_blank" rel="noopener noreferrer"
-                className={buttonVariants({ variant: "outline", size: "sm" })}>
-                <ExternalLink size={15} /> Preview
-              </a>
-            )}
+            <a href={`/products/${product.slug}`} target="_blank" rel="noopener noreferrer"
+              className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <ExternalLink size={15} /> Preview
+            </a>
             <Button size="sm" variant="outline"
               onClick={() => m.setFeatured.mutate({ id, isFeatured: !product.isFeatured, slug: product.slug })}>
               <Star size={15} /> {product.isFeatured ? "Unfeature" : "Feature"}
@@ -77,7 +75,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <StatusBadge status={product.status ?? (published ? "Published" : "Draft")} />
+        <StatusBadge status={product.status} />
         {product.isFeatured && <Badge variant="accent">Featured</Badge>}
         {published
           ? <span className="text-xs text-muted-foreground">Live on the storefront</span>

@@ -10,8 +10,8 @@ import { DataTable } from "@/features/admin/components/data-table";
 import { MediaManager } from "@/features/admin/components/media-manager";
 import { useAdminProducts } from "@/features/admin/admin-hooks";
 import { productImage } from "@/features/products/product-image";
-import type { AdminListQuery } from "@/features/admin/admin-api";
-import type { AdminProduct } from "@/features/admin/admin-types";
+import type { ProductSearchQuery } from "@/features/admin/admin-api";
+import type { ProductSummary } from "@/types/models";
 
 /**
  * Media is scoped per product in the API (/media/products/{productId}/images),
@@ -21,15 +21,15 @@ export default function AdminMediaPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<AdminProduct | null>(null);
+  const [selected, setSelected] = useState<ProductSummary | null>(null);
 
-  const query: AdminListQuery = useMemo(
+  const query: ProductSearchQuery = useMemo(
     () => ({ pageNumber: page, pageSize, search: search || undefined }),
     [page, pageSize, search]
   );
   const { data, isLoading, isFetching, isError, refetch } = useAdminProducts(query);
 
-  const columns = useMemo<ColumnDef<AdminProduct, unknown>[]>(() => [
+  const columns = useMemo<ColumnDef<ProductSummary, unknown>[]>(() => [
     {
       id: "name", header: "Product", accessorFn: (p) => p.name,
       cell: ({ row }) => {
@@ -41,23 +41,20 @@ export default function AdminMediaPage() {
             </div>
             <div className="min-w-0">
               <p className="truncate font-medium">{row.original.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{row.original.sku ?? row.original.slug}</p>
+              <p className="truncate text-xs text-muted-foreground">{row.original.sku}</p>
             </div>
           </div>
         );
       },
     },
     {
-      id: "images", header: "Images", enableSorting: false,
-      accessorFn: (p) => p.images?.length ?? 0,
-      cell: ({ row }) => {
-        const count = row.original.images?.length ?? 0;
-        return (
-          <span className={count === 0 ? "text-sm font-medium text-destructive" : "text-sm"}>
-            {count === 0 ? "No images" : `${count} image${count > 1 ? "s" : ""}`}
-          </span>
-        );
-      },
+      id: "images", header: "Image", enableSorting: false,
+      accessorFn: (p) => !!p.primaryImageUrl,
+      cell: ({ row }) => (
+        <span className={row.original.primaryImageUrl ? "text-sm" : "text-sm font-medium text-destructive"}>
+          {row.original.primaryImageUrl ? "Has image" : "No images"}
+        </span>
+      ),
     },
     {
       id: "actions", header: "", enableSorting: false, enableHiding: false, size: 130,

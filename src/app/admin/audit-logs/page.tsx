@@ -11,8 +11,7 @@ import { DataTable } from "@/features/admin/components/data-table";
 import { DateRangeFilter } from "@/features/admin/components/filter-select";
 import { useAuditLogs, useActorAuditLogs } from "@/features/admin/admin-hooks";
 import { formatDateTime } from "@/lib/format";
-import type { AdminListQuery } from "@/features/admin/admin-api";
-import type { AuditLogEntry } from "@/features/admin/admin-types";
+import type { AuditLogEntry, AuditLogQuery } from "@/features/admin/admin-types";
 
 export default function AdminAuditLogsPage() {
   const [page, setPage] = useState(1);
@@ -24,11 +23,10 @@ export default function AdminAuditLogsPage() {
   const [actorName, setActorName] = useState<string>("");
   const [selected, setSelected] = useState<AuditLogEntry | null>(null);
 
-  const query: AdminListQuery = useMemo(() => ({
+  const query: AuditLogQuery = useMemo(() => ({
     pageNumber: page, pageSize, search: search || undefined,
     from: range.from, to: range.to,
-    sort: sorting[0] ? `${sorting[0].id}_${sorting[0].desc ? "desc" : "asc"}` : undefined,
-  }), [page, pageSize, search, range, sorting]);
+  }), [page, pageSize, search, range]);
 
   // Filtering by actor uses the dedicated endpoint rather than a query param.
   const all = useAuditLogs(query);
@@ -37,20 +35,18 @@ export default function AdminAuditLogsPage() {
 
   const columns = useMemo<ColumnDef<AuditLogEntry, unknown>[]>(() => [
     {
-      id: "occurredAt", header: "When",
-      accessorFn: (a) => a.occurredAt ?? a.createdAt,
+      id: "occurredAtUtc", header: "When",
+      accessorFn: (a) => a.occurredAtUtc,
       cell: ({ row }) => (
-        <span className="whitespace-nowrap text-sm">
-          {formatDateTime(row.original.occurredAt ?? row.original.createdAt)}
-        </span>
+        <span className="whitespace-nowrap text-sm">{formatDateTime(row.original.occurredAtUtc)}</span>
       ),
     },
     {
       id: "actor", header: "Actor", enableSorting: false,
-      accessorFn: (a) => a.actorName ?? a.actorEmail ?? "System",
+      accessorFn: (a) => a.actorEmail ?? "System",
       cell: ({ row }) => {
         const a = row.original;
-        const label = a.actorName ?? a.actorEmail ?? "System";
+        const label = a.actorEmail ?? "System";
         if (!a.actorId) return <span className="text-sm">{label}</span>;
         return (
           <button onClick={(e) => { e.stopPropagation(); setActorId(a.actorId!); setActorName(label); setPage(1); }}
@@ -62,8 +58,8 @@ export default function AdminAuditLogsPage() {
     },
     {
       id: "action", header: "Action", enableSorting: false,
-      accessorFn: (a) => a.action ?? "—",
-      cell: ({ row }) => <Badge variant="muted">{row.original.action ?? "—"}</Badge>,
+      accessorFn: (a) => a.action,
+      cell: ({ row }) => <Badge variant="muted">{row.original.action}</Badge>,
     },
     {
       id: "entity", header: "Entity", enableSorting: false,
@@ -124,36 +120,19 @@ export default function AdminAuditLogsPage() {
           <SheetBody className="space-y-4">
             <dl className="divide-y divide-border text-sm">
               <Row label="Action" value={selected?.action ?? "—"} />
-              <Row label="Actor" value={selected?.actorName ?? selected?.actorEmail ?? "System"} />
+              <Row label="Actor" value={selected?.actorEmail ?? "System"} />
               <Row label="Entity" value={selected?.entityType ?? "—"} />
               <Row label="Entity ID" value={selected?.entityId ?? "—"} />
               <Row label="IP address" value={selected?.ipAddress ?? "—"} />
-              <Row label="When" value={formatDateTime(selected?.occurredAt ?? selected?.createdAt)} />
+              <Row label="User agent" value={selected?.userAgent ?? "—"} />
+              <Row label="When" value={formatDateTime(selected?.occurredAtUtc)} />
             </dl>
-
-            {selected?.description && (
-              <div>
-                <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">Description</p>
-                <p className="text-sm">{selected.description}</p>
-              </div>
-            )}
-
-            {selected?.changes != null && (
-              <div>
-                <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">Changes</p>
-                <pre className="max-h-72 overflow-auto rounded-xl border border-border bg-muted/40 p-3 text-xs">
-                  {typeof selected.changes === "string"
-                    ? selected.changes
-                    : JSON.stringify(selected.changes, null, 2)}
-                </pre>
-              </div>
-            )}
 
             {selected?.actorId && (
               <Button variant="outline" className="w-full"
                 onClick={() => {
                   setActorId(selected.actorId!);
-                  setActorName(selected.actorName ?? selected.actorEmail ?? "Actor");
+                  setActorName(selected.actorEmail ?? "Actor");
                   setSelected(null); setPage(1);
                 }}>
                 View all activity by this user

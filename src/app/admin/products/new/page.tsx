@@ -13,7 +13,7 @@ export default function NewProductPage() {
   const { create } = useProductMutations();
 
   const onSubmit = async (values: ProductFormValues) => {
-    const product = await create.mutateAsync(toProductRequest(values));
+    const product = await create.mutateAsync(toProductRequest(values, false));
     // Land on the edit page so images and inventory can be added right away.
     if (product?.id) router.push(`/admin/products/${product.id}`);
     else router.push("/admin/products");

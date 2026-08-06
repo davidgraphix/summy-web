@@ -28,7 +28,7 @@ const schema = z.object({
   name: z.string().min(1, "Brand name is required"),
   slug: z.string().optional(),
   description: z.string().optional(),
-  logoUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
+  websiteUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
 });
 type Values = z.infer<typeof schema>;
 
@@ -37,11 +37,11 @@ export default function AdminBrandsPage() {
   const m = useBrandMutations();
   const [editing, setEditing] = useState<Brand | "new" | null>(null);
 
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", slug: "", description: "", logoUrl: "" } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", slug: "", description: "", websiteUrl: "" } });
 
-  const openNew = () => { form.reset({ name: "", slug: "", description: "", logoUrl: "" }); setEditing("new"); };
+  const openNew = () => { form.reset({ name: "", slug: "", description: "", websiteUrl: "" }); setEditing("new"); };
   const openEdit = (b: Brand) => {
-    form.reset({ name: b.name, slug: b.slug ?? "", description: "", logoUrl: b.logoUrl ?? "" });
+    form.reset({ name: b.name, slug: b.slug, description: b.description ?? "", websiteUrl: b.websiteUrl ?? "" });
     setEditing(b);
   };
 
@@ -50,7 +50,7 @@ export default function AdminBrandsPage() {
       name: values.name,
       slug: values.slug || undefined,
       description: values.description || undefined,
-      logoUrl: values.logoUrl || undefined,
+      websiteUrl: values.websiteUrl || undefined,
     };
     if (editing === "new") await m.create.mutateAsync(body);
     else if (editing) await m.update.mutateAsync({ id: editing.id, body });
@@ -86,9 +86,7 @@ export default function AdminBrandsPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{b.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {typeof b.productCount === "number" ? `${b.productCount} products` : `/${b.slug ?? b.id.slice(0, 8)}`}
-                    </p>
+                    <p className="truncate text-xs text-muted-foreground">/{b.slug}</p>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -127,8 +125,8 @@ export default function AdminBrandsPage() {
               <Input autoFocus placeholder="Samsung" {...form.register("name")} />
             </Field>
             <Field label="Slug (optional)"><Input placeholder="samsung" {...form.register("slug")} /></Field>
-            <Field label="Logo URL (optional)" error={form.formState.errors.logoUrl?.message}>
-              <Input placeholder="https://res.cloudinary.com/…" {...form.register("logoUrl")} />
+            <Field label="Website (optional)" error={form.formState.errors.websiteUrl?.message}>
+              <Input placeholder="https://www.samsung.com" {...form.register("websiteUrl")} />
             </Field>
             <Field label="Description (optional)"><Textarea rows={3} {...form.register("description")} /></Field>
             <DialogFooter>

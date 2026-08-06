@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
-  Eye, EyeOff, MoreHorizontal, Package, Pencil, Plus, Star, Trash2, Upload,
+  Eye, EyeOff, Info, MoreHorizontal, Package, Pencil, Plus, Star, Trash2, Upload,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,14 +22,11 @@ import { ImportProductsDialog } from "@/features/admin/components/import-product
 import { useAdminProducts, useProductMutations } from "@/features/admin/admin-hooks";
 import { useCategories } from "@/features/categories/categories-hooks";
 import { useBrands } from "@/features/brands/brands-hooks";
-import { formatNaira } from "@/lib/format";
 import { asArray } from "@/lib/utils";
 import { productImage } from "@/features/products/product-image";
 import { API_ROOT } from "@/lib/env";
-import { adminCatalogApi, type AdminListQuery } from "@/features/admin/admin-api";
-import type { AdminProduct } from "@/features/admin/admin-types";
-
-import type { Brand, Category } from "@/types/models";
+import { adminCatalogApi, type ProductSearchQuery } from "@/features/admin/admin-api";
+import type { Brand, Category, ProductSummary } from "@/types/models";
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -39,25 +36,20 @@ export default function AdminProductsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [categoryId, setCategoryId] = useState<string>();
   const [brandId, setBrandId] = useState<string>();
-  const [status, setStatus] = useState<string>();
 
   const { data: categories } = useCategories();
   const { data: brands } = useBrands();
   const m = useProductMutations();
 
-  const query: AdminListQuery = useMemo(() => ({
+  const query: ProductSearchQuery = useMemo(() => ({
     pageNumber: page, pageSize,
     search: search || undefined,
-    categoryId, brandId, status,
-    sort: sorting[0] ? `${sorting[0].id}_${sorting[0].desc ? "desc" : "asc"}` : undefined,
-  }), [page, pageSize, search, categoryId, brandId, status, sorting]);
+    categoryId, brandId,
+  }), [page, pageSize, search, categoryId, brandId]);
 
   const { data, isLoading, isFetching, isError, refetch } = useAdminProducts(query);
 
-  const isPublished = (p: AdminProduct) =>
-    p.isPublished ?? (p.status ? /publish|active|live/i.test(p.status) : undefined);
-
-  const columns = useMemo<ColumnDef<AdminProduct, unknown>[]>(() => [
+  const columns = useMemo<ColumnDef<ProductSummary, unknown>[]>(() => [
     {
       id: "name", header: "Product", accessorFn: (p) => p.name,
       cell: ({ row }) => {
@@ -70,23 +62,22 @@ export default function AdminProductsPage() {
             </div>
             <div className="min-w-0">
               <p className="truncate font-medium">{p.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{p.sku ?? p.slug}</p>
+              <p className="truncate text-xs text-muted-foreground">{p.sku}</p>
             </div>
           </div>
         );
       },
     },
-    { id: "brand", header: "Brand", accessorFn: (p) => p.brand?.name ?? p.brandName ?? "—" },
-    { id: "category", header: "Category", accessorFn: (p) => p.category?.name ?? p.categoryName ?? "—" },
+    { id: "brand", header: "Brand", accessorFn: (p) => p.brandName ?? "—" },
+    { id: "category", header: "Category", accessorFn: (p) => p.categoryName ?? "—" },
     {
-      id: "price", header: "Price", accessorFn: (p) => p.price,
-      cell: ({ row }) => <span className="font-semibold">{formatNaira(row.original.price)}</span>,
+      id: "price", header: "Price", accessorFn: (p) => p.price.kobo,
+      cell: ({ row }) => <span className="font-semibold">{row.original.effectivePrice.formatted}</span>,
     },
     {
-      id: "stock", header: "Stock", accessorFn: (p) => p.stockQuantity ?? 0,
+      id: "stock", header: "Stock", accessorFn: (p) => p.availableQuantity,
       cell: ({ row }) => {
-        const qty = row.original.stockQuantity;
-        if (typeof qty !== "number") return <span className="text-muted-foreground">—</span>;
+        const qty = row.original.availableQuantity;
         return (
           <span className={qty === 0 ? "font-semibold text-destructive" : qty <= 5 ? "font-semibold text-amber-600 dark:text-amber-400" : ""}>
             {qty}
@@ -98,10 +89,9 @@ export default function AdminProductsPage() {
       id: "status", header: "Status", enableSorting: false,
       cell: ({ row }) => {
         const p = row.original;
-        const published = isPublished(p);
         return (
           <div className="flex items-center gap-1.5">
-            <StatusBadge status={p.status ?? (published ? "Published" : "Draft")} />
+            <StatusBadge status={p.status} />
             {p.isFeatured && <Badge variant="accent">Featured</Badge>}
           </div>
         );
@@ -111,7 +101,6 @@ export default function AdminProductsPage() {
       id: "actions", header: "", enableSorting: false, enableHiding: false, size: 60,
       cell: ({ row }) => {
         const p = row.original;
-        const published = isPublished(p);
         return (
           <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
@@ -122,13 +111,11 @@ export default function AdminProductsPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild><Link href={`/admin/products/${p.id}`}><Pencil size={14} /> Edit</Link></DropdownMenuItem>
-                {p.slug && (
-                  <DropdownMenuItem asChild>
-                    <a href={`/products/${p.slug}`} target="_blank" rel="noopener noreferrer"><Eye size={14} /> Preview</a>
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem asChild>
+                  <a href={`/products/${p.slug}`} target="_blank" rel="noopener noreferrer"><Eye size={14} /> Preview</a>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {published ? (
+                {p.isPublished ? (
                   <DropdownMenuItem onClick={() => m.unpublish.mutate({ id: p.id, slug: p.slug })}>
                     <EyeOff size={14} /> Unpublish
                   </DropdownMenuItem>
@@ -179,6 +166,14 @@ export default function AdminProductsPage() {
         }
       />
 
+      <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+        <Info size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
+        <p className="text-muted-foreground">
+          This list only shows published products — the search API is scoped to the live catalogue
+          server-side. Drafts and unpublished products aren&apos;t listed here yet.
+        </p>
+      </div>
+
       <DataTable
         columns={columns}
         data={data}
@@ -209,9 +204,6 @@ export default function AdminProductsPage() {
             <FilterSelect value={brandId} onChange={(v) => { setBrandId(v); setPage(1); }} label="Brand"
               placeholder="All brands" width="w-[150px]"
               options={asArray<Brand>(brands).map((b) => ({ value: b.id, label: b.name }))} />
-            <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} label="Status"
-              placeholder="Any status" width="w-[140px]"
-              options={[{ value: "Published", label: "Published" }, { value: "Draft", label: "Draft" }]} />
           </>
         }
         bulkActions={(ids, clear) => (

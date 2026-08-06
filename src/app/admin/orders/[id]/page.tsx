@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { Download, MessageSquarePlus, Package, Printer, UserPlus, Wallet, XCircle } from "lucide-react";
+import { MessageSquarePlus, Package, Printer, UserPlus, Wallet, XCircle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,6 @@ import {
 } from "@/features/admin/admin-hooks";
 import { usePaymentsByOrder } from "@/features/payments/payments-hooks";
 import { formatDate, formatDateTime, koboToNaira, nairaToKobo } from "@/lib/format";
-import { API_ROOT } from "@/lib/env";
 import type { OrderStatus } from "@/types/models";
 
 const ORDER_STATUSES: OrderStatus[] = [
@@ -55,11 +54,10 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Orders", href: "/admin/orders" }, { label: title }]}
         actions={
           <>
+            {/* The backend only exposes a PDF invoice download scoped to the
+                owning customer (GET /orders/{id}/invoice/pdf); there is no
+                admin-scoped PDF export. Staff use browser print instead. */}
             <Button size="sm" variant="outline" onClick={() => window.print()}><Printer size={15} /> Print</Button>
-            <a href={`${API_ROOT}/admin/orders/${id}/invoice`} target="_blank" rel="noopener noreferrer"
-              className={buttonVariants({ variant: "outline", size: "sm" })}>
-              <Download size={15} /> Invoice
-            </a>
             {order.isCancellable && (
               <CancelOrderDialog pending={m.cancel.isPending}
                 onConfirm={(reason) => m.cancel.mutate({ reason })} />
