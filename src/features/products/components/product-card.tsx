@@ -5,22 +5,18 @@ import Image from "next/image";
 import { Heart, Package, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Rating } from "@/components/shared/rating";
-import { formatNaira, discountPercent } from "@/lib/format";
 import { productImage } from "@/features/products/product-image";
 import { useCart } from "@/features/cart/use-cart";
 import { useAuthStore } from "@/features/auth/auth-store";
 import { useWishlistMutations } from "@/features/wishlist/wishlist-hooks";
-import type { Product } from "@/types/models";
+import type { ProductSummary } from "@/types/models";
 
-export function ProductCard({ product, wished }: { product: Product; wished?: boolean }) {
+export function ProductCard({ product, wished }: { product: ProductSummary; wished?: boolean }) {
   const cart = useCart();
   const isAuth = useAuthStore((s) => s.isAuthenticated);
   const wishlist = useWishlistMutations();
   const img = productImage(product, "card");
-  const off = discountPercent(product.price, product.compareAtPrice);
-  const brand = product.brand?.name ?? product.brandName;
-  const inStock = product.inStock ?? true;
+  const inStock = product.inventoryStatus !== "OutOfStock";
 
   const onWish = () => {
     if (!isAuth) { window.location.href = "/login?redirect=/"; return; }
@@ -37,13 +33,19 @@ export function ProductCard({ product, wished }: { product: Product; wished?: bo
         ) : (
           <span className="absolute inset-0 grid place-items-center text-muted-foreground/40"><Package size={54} strokeWidth={1.2} /></span>
         )}
-        {off > 0 && <Badge variant="destructive" className="absolute left-2 top-2">-{off}%</Badge>}
-        {product.isFeatured && off === 0 && <Badge className="absolute left-2 top-2 bg-foreground">Featured</Badge>}
+        {product.discountPercentage > 0 && (
+          <Badge variant="destructive" className="absolute left-2 top-2">-{product.discountPercentage}%</Badge>
+        )}
+        {product.isFeatured && product.discountPercentage === 0 && (
+          <Badge className="absolute left-2 top-2 bg-foreground">Featured</Badge>
+        )}
       </Link>
 
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         <div className="flex items-center justify-between">
-          {brand && <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">{brand}</span>}
+          {product.brandName && (
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">{product.brandName}</span>
+          )}
           <button onClick={onWish} aria-label="Wishlist" className="ml-auto grid h-6 w-6 place-items-center">
             <Heart size={16} className={wished ? "fill-destructive stroke-destructive" : "stroke-muted-foreground"} />
           </button>
@@ -53,11 +55,11 @@ export function ProductCard({ product, wished }: { product: Product; wished?: bo
           {product.name}
         </Link>
 
-        <Rating value={product.rating ?? 0} count={product.reviewCount} />
-
         <div className="mt-0.5 flex items-baseline gap-2">
-          <span className="font-extrabold">{formatNaira(product.price)}</span>
-          {off > 0 && <span className="text-xs text-muted-foreground line-through">{formatNaira(product.compareAtPrice!)}</span>}
+          <span className="font-extrabold">{product.effectivePrice.formatted}</span>
+          {product.isOnSale && (
+            <span className="text-xs text-muted-foreground line-through">{product.price.formatted}</span>
+          )}
         </div>
 
         <span className={`text-xs font-medium ${inStock ? "text-success" : "text-destructive"}`}>
@@ -65,10 +67,7 @@ export function ProductCard({ product, wished }: { product: Product; wished?: bo
         </span>
 
         <Button size="sm" className="mt-2 h-9 w-full" disabled={!inStock || cart.pending}
-          onClick={() => cart.add({
-            productId: product.id, name: product.name, slug: product.slug,
-            unitPrice: product.price, quantity: 1, lineTotal: product.price, imageUrl: img,
-          })}>
+          onClick={() => cart.add({ productId: product.id, quantity: 1 })}>
           <ShoppingCart size={15} /> Add to cart
         </Button>
       </div>

@@ -3,18 +3,20 @@
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCategories } from "@/features/categories/categories-hooks";
+import type { ProductSortBy } from "@/features/products/products-api";
 
 export interface FilterState {
   categoryId?: string;
   featured?: boolean;
-  sort?: string;
+  sortBy?: ProductSortBy;
 }
 
-const SORTS: Array<[string, string]> = [
+const SORTS: Array<[ProductSortBy | "", string]> = [
   ["", "Recommended"],
-  ["price_asc", "Price: Low to High"],
-  ["price_desc", "Price: High to Low"],
-  ["rating_desc", "Top Rated"],
+  ["Newest", "Newest"],
+  ["PriceLowToHigh", "Price: Low to High"],
+  ["PriceHighToLow", "Price: High to Low"],
+  ["Alphabetical", "A–Z"],
 ];
 
 export function ProductFilters({
@@ -34,8 +36,8 @@ export function ProductFilters({
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <SlidersHorizontal size={15} />
           <select
-            value={state.sort ?? ""}
-            onChange={(e) => onChange({ ...state, sort: e.target.value || undefined })}
+            value={state.sortBy ?? ""}
+            onChange={(e) => onChange({ ...state, sortBy: (e.target.value || undefined) as ProductSortBy | undefined })}
             className="h-9 rounded-lg border border-border bg-card pl-2 pr-7 text-sm font-medium text-foreground outline-none">
             {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
