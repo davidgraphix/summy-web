@@ -40,7 +40,7 @@ export function Header() {
     router.push(q.trim() ? `/?search=${encodeURIComponent(q.trim())}` : "/");
   };
 
-  const unreadCount = unread.data?.count ?? 0;
+  const unreadCount = unread.data?.unreadCount ?? 0;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border"

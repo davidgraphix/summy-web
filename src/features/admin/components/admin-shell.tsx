@@ -29,7 +29,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const logout = useLogout();
   const { data: profile } = useProfile();
   const unread = useUnreadCount();
-  const unreadCount = unread.data?.count ?? 0;
+  const unreadCount = unread.data?.unreadCount ?? 0;
 
   // Persist the collapsed preference across sessions.
   useEffect(() => {
@@ -48,9 +48,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   // Close the mobile drawer on navigation.
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  const name = profile?.fullName
-    ?? [profile?.firstName, profile?.lastName].filter(Boolean).join(" ")
-    ?? "Account";
+  const name = profile?.fullName ?? "Account";
 
   return (
     <div className="min-h-screen bg-background">
@@ -151,8 +149,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <button className="ml-1 flex items-center gap-2 rounded-lg p-1 pr-2 transition-colors hover:bg-muted" aria-label="Account menu">
                   <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-muted text-muted-foreground">
-                    {profile?.avatarUrl
-                      ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    {profile?.profilePictureThumbnailUrl
+                      ? <img src={profile.profilePictureThumbnailUrl} alt="" className="h-full w-full object-cover" />
                       : <User size={15} />}
                   </span>
                   <span className="hidden max-w-[120px] truncate text-sm font-medium sm:inline">{name}</span>
