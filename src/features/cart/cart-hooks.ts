@@ -3,16 +3,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { qk } from "@/lib/query-keys";
-import { useAuthStore } from "@/features/auth/auth-store";
 import { cartApi, type AddItemRequest } from "./cart-api";
 import type { Cart } from "@/types/models";
 
+/**
+ * The cart lives server-side for both guests (keyed by X-Cart-Key) and
+ * signed-in customers (keyed by the access token) — see CartController — so
+ * this is always enabled, no auth gate needed.
+ */
 export function useServerCart() {
-  const isAuth = useAuthStore((s) => s.isAuthenticated);
   return useQuery({
     queryKey: qk.cart.root,
     queryFn: () => cartApi.get(),
-    enabled: isAuth,
   });
 }
 

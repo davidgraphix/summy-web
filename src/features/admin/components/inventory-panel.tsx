@@ -23,9 +23,7 @@ export function InventoryPanel({ productId, slug }: { productId: string; slug?: 
   const [adjustment, setAdjustment] = useState<string>("");
   const [reason, setReason] = useState("");
   const [low, setLow] = useState<string>("");
-  const [reorder, setReorder] = useState<string>("");
-
-  const current = inv?.quantity ?? inv?.stockQuantity;
+  const [maxLevel, setMaxLevel] = useState<string>("");
 
   return (
     <Card>
@@ -39,9 +37,9 @@ export function InventoryPanel({ productId, slug }: { productId: string; slug?: 
           <div className="h-20 animate-pulse rounded-xl bg-muted" />
         ) : (
           <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-            <Metric label="On hand" value={current ?? "—"} />
-            <Metric label="Reserved" value={inv?.reserved ?? "—"} />
-            <Metric label="Available" value={inv?.available ?? (typeof current === "number" ? current - (inv?.reserved ?? 0) : "—")} />
+            <Metric label="On hand" value={inv?.stockQuantity ?? "—"} />
+            <Metric label="Reserved" value={inv?.reservedQuantity ?? "—"} />
+            <Metric label="Available" value={inv?.availableQuantity ?? "—"} />
           </div>
         )}
 
@@ -65,14 +63,14 @@ export function InventoryPanel({ productId, slug }: { productId: string; slug?: 
                     onClick={() => setAdjustment(String((Number(adjustment) || 0) + 1))}><Plus size={15} /></Button>
                 </div>
               </Field>
-              <Field label="Reason">
+              <Field label="Reason (required)">
                 <Input value={reason} onChange={(e) => setReason(e.target.value)}
                   placeholder="Damaged stock, recount, restock…" />
               </Field>
               <Button size="sm" className="w-full"
-                disabled={!adjustment || Number(adjustment) === 0 || m.adjust.isPending}
+                disabled={!adjustment || Number(adjustment) === 0 || !reason.trim() || m.adjust.isPending}
                 onClick={() => m.adjust.mutate(
-                  { adjustment: Number(adjustment), reason: reason || undefined },
+                  { delta: Number(adjustment), reason: reason.trim() },
                   { onSuccess: () => { setAdjustment(""); setReason(""); } }
                 )}>
                 {m.adjust.isPending ? <><Spinner className="h-4 w-4" /> Applying…</> : "Apply adjustment"}
@@ -81,13 +79,13 @@ export function InventoryPanel({ productId, slug }: { productId: string; slug?: 
 
             <div className="space-y-2 border-t border-border pt-4">
               <Field label="Set exact quantity">
-                <Input type="number" min={0} value={stock} placeholder={String(current ?? 0)}
+                <Input type="number" min={0} value={stock} placeholder={String(inv?.stockQuantity ?? 0)}
                   onChange={(e) => setStock(e.target.value)} />
               </Field>
               <Button size="sm" variant="outline" className="w-full"
                 disabled={stock === "" || m.setStock.isPending}
                 onClick={() => m.setStock.mutate(
-                  { quantity: Number(stock), reason: reason || undefined },
+                  { quantity: Number(stock), notes: reason || undefined },
                   { onSuccess: () => setStock("") }
                 )}>
                 {m.setStock.isPending ? <><Spinner className="h-4 w-4" /> Saving…</> : "Set stock level"}
@@ -100,15 +98,15 @@ export function InventoryPanel({ productId, slug }: { productId: string; slug?: 
               <Input type="number" min={0} value={low} placeholder={String(inv?.lowStockThreshold ?? 5)}
                 onChange={(e) => setLow(e.target.value)} />
             </Field>
-            <Field label="Reorder point">
-              <Input type="number" min={0} value={reorder} placeholder={String(inv?.reorderPoint ?? 10)}
-                onChange={(e) => setReorder(e.target.value)} />
+            <Field label="Maximum stock level (optional)">
+              <Input type="number" min={0} value={maxLevel} placeholder="No limit"
+                onChange={(e) => setMaxLevel(e.target.value)} />
             </Field>
             <Button size="sm" className="w-full"
-              disabled={(low === "" && reorder === "") || m.thresholds.isPending}
+              disabled={low === "" || m.thresholds.isPending}
               onClick={() => m.thresholds.mutate({
-                lowStockThreshold: low === "" ? undefined : Number(low),
-                reorderPoint: reorder === "" ? undefined : Number(reorder),
+                lowStockThreshold: Number(low),
+                maximumStockLevel: maxLevel === "" ? undefined : Number(maxLevel),
               })}>
               {m.thresholds.isPending ? <><Spinner className="h-4 w-4" /> Saving…</> : <><Save size={15} /> Save thresholds</>}
             </Button>
@@ -119,29 +117,26 @@ export function InventoryPanel({ productId, slug }: { productId: string; slug?: 
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />)}
               </div>
-            ) : !history.data?.length ? (
+            ) : !history.data?.items.length ? (
               <p className="flex flex-col items-center gap-1 py-6 text-center text-sm text-muted-foreground">
                 <History size={22} /> No stock movements recorded yet.
               </p>
             ) : (
               <ul className="max-h-64 divide-y divide-border overflow-y-auto">
-                {history.data.map((h, i) => {
-                  const change = h.change ?? h.quantity ?? 0;
-                  return (
-                    <li key={h.id ?? i} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{h.reason ?? h.type ?? "Adjustment"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDateTime(h.occurredAt ?? h.createdAt)}
-                          {h.performedBy ? ` · ${h.performedBy}` : ""}
-                        </p>
-                      </div>
-                      <span className={`shrink-0 font-bold ${change >= 0 ? "text-success" : "text-destructive"}`}>
-                        {change >= 0 ? "+" : ""}{change}
-                      </span>
-                    </li>
-                  );
-                })}
+                {history.data.items.map((h) => (
+                  <li key={h.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{h.reason}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(h.occurredAtUtc)}
+                        {h.performedBy ? ` · ${h.performedBy}` : ""}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 font-bold ${h.quantityDelta >= 0 ? "text-success" : "text-destructive"}`}>
+                      {h.quantityDelta >= 0 ? "+" : ""}{h.quantityDelta}
+                    </span>
+                  </li>
+                ))}
               </ul>
             )}
           </TabsContent>

@@ -6,7 +6,6 @@ import {
 } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatNaira } from "@/lib/format";
-import type { SeriesPoint } from "../admin-types";
 
 /** Chart palette derived from the design tokens so it tracks light/dark themes. */
 export const CHART_COLORS = [
@@ -26,36 +25,8 @@ const axisProps = {
   axisLine: false,
 } as const;
 
-/**
- * Analytics DTO field names aren't pinned by the contract, so the charts read
- * the first key that exists rather than assuming one. This keeps them rendering
- * against the real payload without a schema change.
- */
-function pickX(p: SeriesPoint): string {
-  return (p.date ?? p.label ?? p.period ?? p.name ?? "") as string;
-}
-function pickY(p: SeriesPoint, preferred?: string): number {
-  if (preferred && typeof p[preferred] === "number") return p[preferred] as number;
-  const candidates = [p.value, p.revenue, p.orders, p.count, p.amount];
-  return (candidates.find((v) => typeof v === "number") as number) ?? 0;
-}
-
-
-function toSeriesArray(input: unknown): SeriesPoint[] {
-  if (Array.isArray(input)) return input as SeriesPoint[];
-  if (input && typeof input === "object") {
-    for (const key of ["items", "data", "results", "series", "points"]) {
-      const inner = (input as Record<string, unknown>)[key];
-      if (Array.isArray(inner)) return inner as SeriesPoint[];
-    }
-  }
-  return [];
-}
-
-export function normalizeSeries(series: unknown, valueKey?: string) {
-  return toSeriesArray(series).map((p) => ({ x: pickX(p), y: pickY(p, valueKey), raw: p }));
-}
-
+/** A single normalized chart point. Callers map their DTO into this shape. */
+export interface ChartPoint { x: string; y: number }
 
 function ChartFrame({ title, subtitle, children, action, empty }: {
   title: string; subtitle?: string; children: React.ReactNode; action?: React.ReactNode; empty?: boolean;
@@ -106,9 +77,9 @@ const tooltipStyle = {
 } as const;
 
 export function RevenueTrendChart({ data, title = "Revenue trend", subtitle }: {
-  data: SeriesPoint[] | undefined; title?: string; subtitle?: string;
+  data: ChartPoint[] | undefined; title?: string; subtitle?: string;
 }) {
-  const points = normalizeSeries(data, "revenue");
+  const points = data ?? [];
   return (
     <ChartFrame title={title} subtitle={subtitle} empty={points.length === 0}>
       <ResponsiveContainer width="100%" height="100%">
@@ -132,9 +103,9 @@ export function RevenueTrendChart({ data, title = "Revenue trend", subtitle }: {
 }
 
 export function OrdersBarChart({ data, title = "Sales overview", subtitle }: {
-  data: SeriesPoint[] | undefined; title?: string; subtitle?: string;
+  data: ChartPoint[] | undefined; title?: string; subtitle?: string;
 }) {
-  const points = normalizeSeries(data, "orders");
+  const points = data ?? [];
   return (
     <ChartFrame title={title} subtitle={subtitle} empty={points.length === 0}>
       <ResponsiveContainer width="100%" height="100%">
@@ -151,9 +122,9 @@ export function OrdersBarChart({ data, title = "Sales overview", subtitle }: {
 }
 
 export function GrowthLineChart({ data, title = "Customer growth", subtitle }: {
-  data: SeriesPoint[] | undefined; title?: string; subtitle?: string;
+  data: ChartPoint[] | undefined; title?: string; subtitle?: string;
 }) {
-  const points = normalizeSeries(data, "count");
+  const points = data ?? [];
   return (
     <ChartFrame title={title} subtitle={subtitle} empty={points.length === 0}>
       <ResponsiveContainer width="100%" height="100%">
@@ -170,10 +141,10 @@ export function GrowthLineChart({ data, title = "Customer growth", subtitle }: {
   );
 }
 
-export function HorizontalBarChart({ data, title, subtitle, valueKey, currency }: {
-  data: SeriesPoint[] | undefined; title: string; subtitle?: string; valueKey?: string; currency?: boolean;
+export function HorizontalBarChart({ data, title, subtitle, currency }: {
+  data: ChartPoint[] | undefined; title: string; subtitle?: string; currency?: boolean;
 }) {
-  const points = normalizeSeries(data, valueKey).slice(0, 8);
+  const points = (data ?? []).slice(0, 8);
   return (
     <ChartFrame title={title} subtitle={subtitle} empty={points.length === 0}>
       <ResponsiveContainer width="100%" height="100%">
@@ -193,9 +164,9 @@ export function HorizontalBarChart({ data, title, subtitle, valueKey, currency }
 }
 
 export function DistributionPieChart({ data, title, subtitle, currency }: {
-  data: SeriesPoint[] | undefined; title: string; subtitle?: string; currency?: boolean;
+  data: ChartPoint[] | undefined; title: string; subtitle?: string; currency?: boolean;
 }) {
-  const points = normalizeSeries(data);
+  const points = data ?? [];
   return (
     <ChartFrame title={title} subtitle={subtitle} empty={points.length === 0}>
       <ResponsiveContainer width="100%" height="100%">
