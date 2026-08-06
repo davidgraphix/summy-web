@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowRight, Package, ShoppingCart, Trash2, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
-import { formatNaira } from "@/lib/format";
 import { useCart } from "@/features/cart/use-cart";
 
 /** Lightweight global open/close via a module store (no context needed). */
@@ -49,8 +48,8 @@ export function CartDrawer() {
                     {l.imageUrl ? <img src={l.imageUrl} alt="" className="h-full w-full object-cover" /> : <Package size={26} />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm font-medium">{l.name}</p>
-                    <p className="mt-0.5 text-sm font-bold">{formatNaira(l.unitPrice)}</p>
+                    <p className="line-clamp-2 text-sm font-medium">{l.productName}</p>
+                    <p className="mt-0.5 text-sm font-bold">{l.currentUnitPriceFormatted}</p>
                     <div className="mt-2 flex items-center justify-between">
                       <QuantityStepper value={l.quantity} onChange={(q) => cart.setQuantity(l.productId, q)} />
                       <button onClick={() => cart.remove(l.productId)} aria-label="Remove" className="text-destructive"><Trash2 size={17} /></button>
@@ -62,7 +61,7 @@ export function CartDrawer() {
             </div>
             <div className="shrink-0 border-t border-border bg-card p-4">
               <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
-                <span>Subtotal</span><span className="font-semibold text-foreground">{formatNaira(cart.subtotal)}</span>
+                <span>Subtotal</span><span className="font-semibold text-foreground">{cart.cart?.subtotalFormatted}</span>
               </div>
               <p className="mb-3 text-sm text-muted-foreground">Shipping &amp; VAT calculated at checkout</p>
               <Link href="/checkout" onClick={() => setOpen(false)}

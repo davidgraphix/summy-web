@@ -7,7 +7,8 @@ import {
   adminAuditApi, adminBrandsApi, adminCatalogApi, adminCategoriesApi, adminCustomersApi,
   adminDashboardApi, adminEmailsApi, adminInventoryApi, adminMediaApi, adminOrdersApi,
   adminPaymentsApi, adminProductsApi, adminRolesApi, adminSettingsApi, adminUsersApi,
-  type AdminListQuery,
+  type AdminListQuery, type AdminOrderQuery, type AdminPaymentQuery, type ProductSearchQuery,
+  type RefundQuery,
 } from "./admin-api";
 import { invalidateStorefront, invalidateProduct, revalidateProduct } from "./invalidate-storefront";
 import type * as T from "./admin-types";
@@ -18,21 +19,21 @@ const onError = (e: Error) => toast.error(e.message || "Something went wrong");
 export function useAdminDashboard() {
   return useQuery({ queryKey: qk.admin.dashboard, queryFn: () => adminDashboardApi.overview() });
 }
-export function useSalesAnalytics(q: AdminListQuery = {}) {
+export function useSalesAnalytics(q: T.DateRangeQuery = {}) {
   return useQuery({ queryKey: qk.admin.analytics("sales", q), queryFn: () => adminDashboardApi.sales(q), placeholderData: keepPreviousData });
 }
-export function useCustomerAnalytics(q: AdminListQuery = {}) {
+export function useCustomerAnalytics(q: T.DateRangeQuery = {}) {
   return useQuery({ queryKey: qk.admin.analytics("customers", q), queryFn: () => adminDashboardApi.customers(q), placeholderData: keepPreviousData });
 }
-export function useProductAnalytics(q: AdminListQuery = {}) {
+export function useProductAnalytics(q: T.DateRangeQuery = {}) {
   return useQuery({ queryKey: qk.admin.analytics("products", q), queryFn: () => adminDashboardApi.products(q), placeholderData: keepPreviousData });
 }
-export function usePaymentAnalytics(q: AdminListQuery = {}) {
+export function usePaymentAnalytics(q: T.DateRangeQuery = {}) {
   return useQuery({ queryKey: qk.admin.analytics("payments", q), queryFn: () => adminDashboardApi.payments(q), placeholderData: keepPreviousData });
 }
 
 /* --------------------------------- Orders ------------------------------- */
-export function useAdminOrders(q: AdminListQuery) {
+export function useAdminOrders(q: AdminOrderQuery) {
   return useQuery({ queryKey: qk.admin.orders.list(q), queryFn: () => adminOrdersApi.list(q), placeholderData: keepPreviousData });
 }
 export function useAdminOrder(id: string) {
@@ -67,20 +68,20 @@ export function useAdminOrderMutations(id: string) {
       onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: qk.admin.payments.all }); toast.success("Payment recorded"); }, onError,
     }),
     cancel: useMutation({
-      mutationFn: () => adminOrdersApi.cancel(id),
+      mutationFn: (body: T.CancelOrderRequest) => adminOrdersApi.cancel(id, body),
       onSuccess: () => { refresh(); toast.success("Order cancelled"); }, onError,
     }),
   };
 }
 
 /* -------------------------------- Payments ------------------------------ */
-export function useAdminPayments(q: AdminListQuery) {
+export function useAdminPayments(q: AdminPaymentQuery) {
   return useQuery({ queryKey: qk.admin.payments.list(q), queryFn: () => adminPaymentsApi.list(q), placeholderData: keepPreviousData });
 }
 export function useAdminPayment(id: string) {
   return useQuery({ queryKey: qk.admin.payments.detail(id), queryFn: () => adminPaymentsApi.byId(id), enabled: !!id });
 }
-export function useRefunds(q: AdminListQuery) {
+export function useRefunds(q: RefundQuery) {
   return useQuery({ queryKey: qk.admin.payments.refunds(q), queryFn: () => adminPaymentsApi.refunds(q), placeholderData: keepPreviousData });
 }
 export function usePaymentMutations() {
@@ -96,11 +97,11 @@ export function usePaymentMutations() {
       onSuccess: () => { refresh(); toast.success("Refund requested"); }, onError,
     }),
     approveRefund: useMutation({
-      mutationFn: (id: string) => adminPaymentsApi.approveRefund(id),
+      mutationFn: (p: { id: string; body: T.ApproveRefundRequest }) => adminPaymentsApi.approveRefund(p.id, p.body),
       onSuccess: () => { refresh(); toast.success("Refund approved"); }, onError,
     }),
     rejectRefund: useMutation({
-      mutationFn: (id: string) => adminPaymentsApi.rejectRefund(id),
+      mutationFn: (p: { id: string; body: T.RejectRefundRequest }) => adminPaymentsApi.rejectRefund(p.id, p.body),
       onSuccess: () => { refresh(); toast.success("Refund rejected"); }, onError,
     }),
   };
@@ -230,7 +231,7 @@ export function useSettingsMutations() {
 }
 
 /* ------------------------------- Email logs ----------------------------- */
-export function useEmailLogs(q: AdminListQuery) {
+export function useEmailLogs(q: T.EmailLogQuery) {
   return useQuery({ queryKey: qk.admin.emails.list(q), queryFn: () => adminEmailsApi.logs(q), placeholderData: keepPreviousData });
 }
 export function useEmailLog(id: string) {
@@ -239,9 +240,10 @@ export function useEmailLog(id: string) {
 export function useEmailMutations() {
   const qc = useQueryClient();
   return {
+    // Processes every email currently due for retry (no id list — see adminEmailsApi.retry).
     retry: useMutation({
-      mutationFn: (emailIds: string[]) => adminEmailsApi.retry({ emailIds }),
-      onSuccess: () => { qc.invalidateQueries({ queryKey: qk.admin.emails.all }); toast.success("Retry queued"); }, onError,
+      mutationFn: () => adminEmailsApi.retry(),
+      onSuccess: (count) => { qc.invalidateQueries({ queryKey: qk.admin.emails.all }); toast.success(`${count} email(s) queued for retry`); }, onError,
     }),
     test: useMutation({
       mutationFn: (body: T.TestEmailRequest) => adminEmailsApi.test(body),
@@ -251,7 +253,7 @@ export function useEmailMutations() {
 }
 
 /* ------------------------------- Audit logs ----------------------------- */
-export function useAuditLogs(q: AdminListQuery) {
+export function useAuditLogs(q: T.AuditLogQuery) {
   return useQuery({ queryKey: qk.admin.audit.list(q), queryFn: () => adminAuditApi.list(q), placeholderData: keepPreviousData });
 }
 export function useActorAuditLogs(actorId: string, q: AdminListQuery) {
@@ -263,7 +265,7 @@ export function useActorAuditLogs(actorId: string, q: AdminListQuery) {
 }
 
 /* -------------------------------- Products ------------------------------ */
-export function useAdminProducts(q: AdminListQuery) {
+export function useAdminProducts(q: ProductSearchQuery) {
   return useQuery({ queryKey: qk.admin.products.list(q), queryFn: () => adminProductsApi.list(q), placeholderData: keepPreviousData });
 }
 export function useAdminProduct(id: string) {
@@ -310,8 +312,8 @@ export function useProductMutations() {
 }
 
 /* ------------------------------- Inventory ------------------------------ */
-export function useLowStock(q: AdminListQuery) {
-  return useQuery({ queryKey: qk.admin.inventory.lowStock(q), queryFn: () => adminInventoryApi.lowStock(q), placeholderData: keepPreviousData });
+export function useLowStock(pageNumber = 1, pageSize = 20) {
+  return useQuery({ queryKey: qk.admin.inventory.lowStock({ pageNumber, pageSize }), queryFn: () => adminInventoryApi.lowStock(pageNumber, pageSize), placeholderData: keepPreviousData });
 }
 export function useProductInventory(id: string) {
   return useQuery({ queryKey: qk.admin.inventory.product(id), queryFn: () => adminInventoryApi.forProduct(id), enabled: !!id });
@@ -388,24 +390,24 @@ export function useMediaMutations(productId: string, slug?: string) {
       onSuccess: () => { refresh(); toast.success("Images uploaded"); }, onError }),
     setFeatured: useMutation({ mutationFn: (imageId: string) => adminMediaApi.setFeatured(productId, imageId),
       onSuccess: () => { refresh(); toast.success("Featured image updated"); }, onError }),
-    setDescription: useMutation({ mutationFn: (p: { imageId: string; description: string }) =>
-        adminMediaApi.setDescription(productId, p.imageId, p.description),
+    setDescription: useMutation({ mutationFn: (p: { imageId: string; altText?: string; caption?: string }) =>
+        adminMediaApi.setDescription(productId, p.imageId, { altText: p.altText, caption: p.caption }),
       onSuccess: () => { refresh(); toast.success("Description saved"); }, onError }),
-    reorder: useMutation({ mutationFn: (imageIds: string[]) => adminMediaApi.reorder(productId, { imageIds }),
+    reorder: useMutation({ mutationFn: (orderedImageIds: string[]) => adminMediaApi.reorder(productId, { orderedImageIds }),
       onSuccess: () => refresh(), onError }),
     remove: useMutation({ mutationFn: (imageId: string) => adminMediaApi.remove(productId, imageId),
       onSuccess: () => { refresh(); toast.success("Image removed"); }, onError }),
-    removeAll: useMutation({ mutationFn: () => adminMediaApi.removeAll(productId),
-      onSuccess: () => { refresh(); toast.success("All images removed"); }, onError }),
+    removeMany: useMutation({ mutationFn: (imageIds: string[]) => adminMediaApi.removeMany(productId, { imageIds }),
+      onSuccess: () => { refresh(); toast.success("Images removed"); }, onError }),
   };
 }
 
 /* ------------------------------ Bulk catalog ---------------------------- */
-export function useDeletedProducts(q: AdminListQuery) {
-  return useQuery({ queryKey: qk.admin.catalog.deletedProducts(q), queryFn: () => adminCatalogApi.deletedProducts(q), placeholderData: keepPreviousData });
+export function useDeletedProducts(pageNumber = 1, pageSize = 20) {
+  return useQuery({ queryKey: qk.admin.catalog.deletedProducts({ pageNumber, pageSize }), queryFn: () => adminCatalogApi.deletedProducts(pageNumber, pageSize), placeholderData: keepPreviousData });
 }
-export function useDeletedCategories(q: AdminListQuery) {
-  return useQuery({ queryKey: qk.admin.catalog.deletedCategories(q), queryFn: () => adminCatalogApi.deletedCategories(q), placeholderData: keepPreviousData });
+export function useDeletedCategories(pageNumber = 1, pageSize = 20) {
+  return useQuery({ queryKey: qk.admin.catalog.deletedCategories({ pageNumber, pageSize }), queryFn: () => adminCatalogApi.deletedCategories(pageNumber, pageSize), placeholderData: keepPreviousData });
 }
 export function useCatalogMutations() {
   const qc = useQueryClient();
@@ -415,8 +417,12 @@ export function useCatalogMutations() {
     invalidateStorefront(qc);
   };
   return {
-    importProducts: useMutation({ mutationFn: (file: File) => adminCatalogApi.importProducts(file),
-      onSuccess: () => { refresh(); toast.success("Import complete"); }, onError }),
+    importProducts: useMutation({ mutationFn: (body: T.ProductImportRequest) => adminCatalogApi.importProducts(body),
+      onSuccess: (result) => {
+        refresh();
+        if (result.wasValidationOnly) toast.success(`Validated ${result.totalRows} row(s) — ${result.failed} would fail`);
+        else toast.success(`Imported: ${result.created} created, ${result.updated} updated, ${result.failed} failed`);
+      }, onError }),
     restoreProduct: useMutation({ mutationFn: (id: string) => adminCatalogApi.restoreProduct(id),
       onSuccess: () => { refresh(); toast.success("Product restored"); }, onError }),
     restoreCategory: useMutation({ mutationFn: (id: string) => adminCatalogApi.restoreCategory(id),

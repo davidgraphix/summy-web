@@ -1,19 +1,18 @@
 import { z } from "zod";
 
-/**
- * Field names mirror the Address model in @/types/models. If the backend DTO
- * uses different names (street vs line1, zip vs postalCode), change them in
- * both places — this schema and the model.
- */
+/** Mirrors CreateAddressRequest / UpdateAddressRequest / OrderAddressRequest field names exactly. */
 export const addressSchema = z.object({
-  fullName: z.string().min(1, "Full name is required"),
+  recipientName: z.string().min(1, "Full name is required"),
   phoneNumber: z.string().min(7, "Enter a valid phone number"),
-  line1: z.string().min(1, "Street address is required"),
-  line2: z.string().optional(),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
-  postalCode: z.string().optional(),
   country: z.string().min(1, "Country is required").default("Nigeria"),
+  state: z.string().min(1, "State is required"),
+  city: z.string().min(1, "City is required"),
+  localGovernment: z.string().optional(),
+  streetAddress: z.string().min(1, "Street address is required"),
+  apartmentSuite: z.string().optional(),
+  postalCode: z.string().optional(),
+  landmark: z.string().optional(),
+  deliveryInstructions: z.string().optional(),
 });
 
 export type AddressValues = z.infer<typeof addressSchema>;
