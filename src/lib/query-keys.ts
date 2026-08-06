@@ -1,6 +1,9 @@
 import type { ProductQuery } from "@/features/products/products-api";
 import type { AdminListQuery } from "@/features/admin/admin-api";
 
+/** Query-key builders don't care about the exact query shape — just that it's part of the key. */
+type AnyQuery = object;
+
 /** Central registry of TanStack Query keys for consistent invalidation. */
 export const qk = {
   products: {
@@ -43,18 +46,18 @@ export const qk = {
   admin: {
     root: ["admin"] as const,
     dashboard: ["admin", "dashboard"] as const,
-    analytics: (kind: string, q: AdminListQuery) => ["admin", "analytics", kind, q] as const,
+    analytics: (kind: string, q: AnyQuery) => ["admin", "analytics", kind, q] as const,
     orders: {
       all: ["admin", "orders"] as const,
-      list: (q: AdminListQuery) => ["admin", "orders", "list", q] as const,
+      list: (q: AnyQuery) => ["admin", "orders", "list", q] as const,
       detail: (id: string) => ["admin", "orders", "detail", id] as const,
       timeline: (id: string) => ["admin", "orders", "timeline", id] as const,
     },
     payments: {
       all: ["admin", "payments"] as const,
-      list: (q: AdminListQuery) => ["admin", "payments", "list", q] as const,
+      list: (q: AnyQuery) => ["admin", "payments", "list", q] as const,
       detail: (id: string) => ["admin", "payments", "detail", id] as const,
-      refunds: (q: AdminListQuery) => ["admin", "payments", "refunds", q] as const,
+      refunds: (q: AnyQuery) => ["admin", "payments", "refunds", q] as const,
     },
     customers: {
       all: ["admin", "customers"] as const,
@@ -77,26 +80,26 @@ export const qk = {
     settings: ["admin", "settings"] as const,
     emails: {
       all: ["admin", "emails"] as const,
-      list: (q: AdminListQuery) => ["admin", "emails", "list", q] as const,
+      list: (q: AnyQuery) => ["admin", "emails", "list", q] as const,
       detail: (id: string) => ["admin", "emails", "detail", id] as const,
     },
     audit: {
       all: ["admin", "audit"] as const,
-      list: (q: AdminListQuery) => ["admin", "audit", "list", q] as const,
-      byActor: (actorId: string, q: AdminListQuery) => ["admin", "audit", "actor", actorId, q] as const,
+      list: (q: AnyQuery) => ["admin", "audit", "list", q] as const,
+      byActor: (actorId: string, q: AnyQuery) => ["admin", "audit", "actor", actorId, q] as const,
     },
     catalog: {
-      deletedProducts: (q: AdminListQuery) => ["admin", "catalog", "deleted-products", q] as const,
-      deletedCategories: (q: AdminListQuery) => ["admin", "catalog", "deleted-categories", q] as const,
+      deletedProducts: (q: AnyQuery) => ["admin", "catalog", "deleted-products", q] as const,
+      deletedCategories: (q: AnyQuery) => ["admin", "catalog", "deleted-categories", q] as const,
     },
     products: {
       all: ["admin", "products"] as const,
-      list: (q: AdminListQuery) => ["admin", "products", "list", q] as const,
+      list: (q: AnyQuery) => ["admin", "products", "list", q] as const,
       detail: (id: string) => ["admin", "products", "detail", id] as const,
     },
     inventory: {
       all: ["admin", "inventory"] as const,
-      lowStock: (q: AdminListQuery) => ["admin", "inventory", "low-stock", q] as const,
+      lowStock: (q: AnyQuery) => ["admin", "inventory", "low-stock", q] as const,
       product: (id: string) => ["admin", "inventory", "product", id] as const,
       history: (id: string) => ["admin", "inventory", "history", id] as const,
     },

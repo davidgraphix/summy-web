@@ -12,10 +12,10 @@ export function useProducts(query: ProductQuery) {
   });
 }
 
-export function useFeaturedProducts() {
+export function useFeaturedProducts(pageSize?: number) {
   return useQuery({
     queryKey: qk.products.featured,
-    queryFn: ({ signal }) => productsApi.featured(signal),
+    queryFn: ({ signal }) => productsApi.featured(pageSize, signal),
   });
 }
 

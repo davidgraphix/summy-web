@@ -28,16 +28,19 @@ interface RequestOptions {
   body?: unknown;
   /** Attach the bearer token and enable refresh-on-401. Default true. */
   auth?: boolean;
-  params?: Record<string, QueryValue | QueryValue[]>;
+  /** Any plain query-param object — values are stringified, arrays repeat the key, null/undefined are dropped. */
+  params?: object;
   signal?: AbortSignal;
   /** Send FormData as-is (avatar upload). */
   formData?: FormData;
+  /** Extra headers for this call (e.g. X-Cart-Key for the guest cart). */
+  headers?: Record<string, string>;
 }
 
 function buildUrl(path: string, params?: RequestOptions["params"]): string {
   const url = new URL(`${API_ROOT}${path.startsWith("/") ? path : `/${path}`}`);
   if (params) {
-    for (const [key, value] of Object.entries(params)) {
+    for (const [key, value] of Object.entries(params as Record<string, QueryValue | QueryValue[]>)) {
       if (value === undefined || value === null) continue;
       if (Array.isArray(value)) value.forEach((v) => v != null && url.searchParams.append(key, String(v)));
       else url.searchParams.set(key, String(value));
@@ -83,7 +86,7 @@ async function refreshTokens(): Promise<boolean> {
 async function execute<T>(path: string, options: RequestOptions, isRetry = false): Promise<T> {
   const { method = "GET", body, auth = true, params, signal, formData } = options;
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...options.headers };
   if (!formData) headers["Content-Type"] = "application/json";
   if (auth) {
     const { accessToken, refreshToken } = useAuthStore.getState();
@@ -143,7 +146,8 @@ export const api = {
     execute<T>(path, { ...opts, method: "PUT", body }),
   patch: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, "method" | "body">) =>
     execute<T>(path, { ...opts, method: "PATCH", body }),
-  delete: <T>(path: string, opts?: Omit<RequestOptions, "method" | "body">) =>
+  /** `body` is rare on DELETE but required by a couple of bulk-delete endpoints. */
+  delete: <T>(path: string, opts?: Omit<RequestOptions, "method">) =>
     execute<T>(path, { ...opts, method: "DELETE" }),
   postForm: <T>(path: string, formData: FormData, opts?: Omit<RequestOptions, "method" | "body" | "formData">) =>
     execute<T>(path, { ...opts, method: "POST", formData }),
