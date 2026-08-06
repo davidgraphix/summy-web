@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Package, ShoppingCart, Trash2 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { EmptyState, LoadingState } from "@/components/shared/states";

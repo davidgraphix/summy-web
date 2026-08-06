@@ -9,13 +9,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const p = await productsApi.bySlug(slug);
     // SEO fields set in the admin dashboard take precedence over the defaults.
-    const title = p.metaTitle?.trim() || p.name;
+    const title = p.seo.metaTitle?.trim() || p.name;
     const description =
-      p.metaDescription?.trim() || p.description?.slice(0, 160) || `Buy ${p.name} on Summy`;
+      p.seo.metaDescription?.trim() || p.shortDescription?.slice(0, 160) || `Buy ${p.name} on Summy`;
+    const image = p.images.find((i) => i.isFeatured)?.secureUrl ?? p.images[0]?.secureUrl;
     return {
       title,
       description,
-      openGraph: { title, description, images: p.primaryImageUrl ? [p.primaryImageUrl] : [] },
+      openGraph: { title, description, images: image ? [image] : [] },
     };
   } catch {
     return { title: "Product" };

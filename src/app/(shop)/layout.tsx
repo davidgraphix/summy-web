@@ -1,5 +1,6 @@
 import { Header } from "@/components/shared/header";
 import { CartDrawer } from "@/components/shared/cart-drawer";
+import { StoreFooter } from "@/components/shared/store-footer";
 
 export default function ShopLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,9 +8,7 @@ export default function ShopLayout({ children }: { children: React.ReactNode }) 
       <Header />
       {children}
       <CartDrawer />
-      <footer className="mx-auto max-w-6xl px-4 py-10 text-center text-xs text-muted-foreground">
-        Summy Solution &amp; Technology Ventures · BN-3217879 · Nationwide delivery across Nigeria
-      </footer>
+      <StoreFooter />
     </div>
   );
 }

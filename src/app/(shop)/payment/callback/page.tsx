@@ -8,20 +8,19 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useVerifyPayment } from "@/features/payments/payments-hooks";
-import { formatNaira } from "@/lib/format";
 
 /**
- * Flutterwave returns the customer here after hosted checkout. The reference
- * may arrive under different query keys depending on gateway configuration,
- * so we accept the common variants. TODO: pin this to the exact key the
- * backend configures on its redirect URL.
+ * Flutterwave's hosted checkout redirects here with `tx_ref` — the same
+ * reference the backend verifies by (see FlutterwavePaymentProvider's
+ * verify_by_reference call). `transaction_id` and `trxref` are accepted as
+ * fallbacks for older Flutterwave redirect formats.
  */
 function resolveReference(params: URLSearchParams): string {
   return (
-    params.get("reference") ??
     params.get("tx_ref") ??
     params.get("transaction_id") ??
     params.get("trxref") ??
+    params.get("reference") ??
     ""
   );
 }
@@ -80,7 +79,7 @@ function CallbackInner() {
 
   // Verification succeeded. Treat an explicit failure status from the payment
   // record as a failure; otherwise show success.
-  const failed = typeof payment?.status === "string" && /fail|cancel|abandon/i.test(payment.status);
+  const failed = payment?.status === "Failed" || payment?.status === "Cancelled" || payment?.status === "Expired";
 
   if (failed || statusHint === "cancelled") {
     return (
@@ -106,9 +105,7 @@ function CallbackInner() {
           {payment?.reference && (
             <MetaRow label="Reference" value={payment.reference} />
           )}
-          {typeof payment?.amount === "number" && (
-            <MetaRow label="Amount paid" value={formatNaira(payment.amount)} />
-          )}
+          {payment && <MetaRow label="Amount paid" value={payment.amountFormatted} />}
           {payment?.status && <MetaRow label="Status" value={payment.status} />}
         </>
       }
