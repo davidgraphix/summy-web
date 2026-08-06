@@ -13,7 +13,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/shared/field";
 import { EmptyState, LoadingState } from "@/components/shared/states";
 import { Spinner } from "@/components/ui/spinner";
-import { formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/features/cart/use-cart";
 import { useAuthStore } from "@/features/auth/auth-store";
@@ -72,11 +71,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const server = cart.serverCart;
-  const subtotal = server?.subtotal ?? cart.subtotal;
-  const tax = server?.tax;
-  const shipping = server?.shipping;
-  const total = server?.total ?? subtotal;
+  const server = cart.cart;
 
   /**
    * Shopping flow: Create Order → Initialize Payment → redirect to Flutterwave.
@@ -86,10 +81,11 @@ export default function CheckoutPage() {
     setSubmitting(true);
     try {
       const order = await createOrder.mutateAsync({
+        items: cart.lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
         ...(mode === "saved" && selectedAddressId
           ? { shippingAddressId: selectedAddressId }
           : { shippingAddress }),
-        notes: notes || undefined,
+        customerNote: notes || undefined,
       });
 
       const redirectUrl =
@@ -159,12 +155,10 @@ export default function CheckoutPage() {
                           </span>
                           <span className="min-w-0">
                             <span className="block font-semibold">
-                              {a.fullName ?? "Saved address"}
+                              {a.recipientName}
                               {a.isDefault && <span className="ml-2 text-xs font-medium text-accent">Default</span>}
                             </span>
-                            <span className="block text-muted-foreground">
-                              {[a.line1, a.line2, a.city, a.state, a.country].filter(Boolean).join(", ")}
-                            </span>
+                            <span className="block text-muted-foreground">{a.formattedAddress}</span>
                             {a.phoneNumber && <span className="block text-muted-foreground">{a.phoneNumber}</span>}
                           </span>
                         </button>
@@ -182,8 +176,8 @@ export default function CheckoutPage() {
 
                   {mode === "new" && (
                     <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
-                      <Field label="Full name" error={form.formState.errors.fullName?.message} className="sm:col-span-2">
-                        <Input placeholder="Adaeze Okonkwo" {...form.register("fullName")} />
+                      <Field label="Full name" error={form.formState.errors.recipientName?.message} className="sm:col-span-2">
+                        <Input placeholder="Adaeze Okonkwo" {...form.register("recipientName")} />
                       </Field>
                       <Field label="Phone number" error={form.formState.errors.phoneNumber?.message}>
                         <Input placeholder="0803 000 0000" inputMode="tel" {...form.register("phoneNumber")} />
@@ -191,11 +185,11 @@ export default function CheckoutPage() {
                       <Field label="City" error={form.formState.errors.city?.message}>
                         <Input placeholder="Ikeja" {...form.register("city")} />
                       </Field>
-                      <Field label="Street address" error={form.formState.errors.line1?.message} className="sm:col-span-2">
-                        <Input placeholder="12 Allen Avenue" {...form.register("line1")} />
+                      <Field label="Street address" error={form.formState.errors.streetAddress?.message} className="sm:col-span-2">
+                        <Input placeholder="12 Allen Avenue" {...form.register("streetAddress")} />
                       </Field>
                       <Field label="Apartment, suite (optional)" className="sm:col-span-2">
-                        <Input placeholder="Flat 4B" {...form.register("line2")} />
+                        <Input placeholder="Flat 4B" {...form.register("apartmentSuite")} />
                       </Field>
                       <Field label="State" error={form.formState.errors.state?.message}>
                         <select {...form.register("state")}
@@ -205,6 +199,9 @@ export default function CheckoutPage() {
                       </Field>
                       <Field label="Postal code (optional)">
                         <Input placeholder="100001" {...form.register("postalCode")} />
+                      </Field>
+                      <Field label="Landmark (optional)">
+                        <Input placeholder="Near First Bank" {...form.register("landmark")} />
                       </Field>
                       <Field label="Country" error={form.formState.errors.country?.message} className="sm:col-span-2">
                         <Input {...form.register("country")} />
@@ -250,34 +247,34 @@ export default function CheckoutPage() {
                       {l.imageUrl ? <img src={l.imageUrl} alt="" className="h-full w-full object-cover" /> : <Package size={20} />}
                     </div>
                     <div className="min-w-0 flex-1 text-sm">
-                      <p className="line-clamp-1 font-medium">{l.name}</p>
+                      <p className="line-clamp-1 font-medium">{l.productName}</p>
                       <p className="text-muted-foreground">Qty {l.quantity}</p>
                     </div>
-                    <span className="text-sm font-semibold">{formatNaira(l.lineTotal)}</span>
+                    <span className="text-sm font-semibold">{l.lineTotalFormatted}</span>
                   </li>
                 ))}
               </ul>
 
               <dl className="space-y-2 border-t border-border pt-4 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Subtotal</dt><dd className="font-medium">{formatNaira(subtotal)}</dd>
+                  <dt className="text-muted-foreground">Subtotal</dt><dd className="font-medium">{server?.subtotalFormatted ?? "—"}</dd>
                 </div>
-                {typeof shipping === "number" && (
+                {server && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Shipping</dt>
-                    <dd className="font-medium">{shipping === 0 ? "Free" : formatNaira(shipping)}</dd>
+                    <dt className="text-muted-foreground">Delivery</dt>
+                    <dd className="font-medium">{server.deliveryFeeInKobo === 0 ? "Free" : server.deliveryFeeFormatted}</dd>
                   </div>
                 )}
-                {typeof tax === "number" && (
+                {server && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">VAT</dt><dd className="font-medium">{formatNaira(tax)}</dd>
+                    <dt className="text-muted-foreground">VAT</dt><dd className="font-medium">{server.vatFormatted}</dd>
                   </div>
                 )}
               </dl>
 
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <span className="font-semibold">Total</span>
-                <span className="text-xl font-extrabold">{formatNaira(total)}</span>
+                <span className="text-xl font-extrabold">{server?.totalFormatted ?? "—"}</span>
               </div>
 
               <Button className="mt-5 h-12 w-full" onClick={handlePlaceOrder} disabled={busy}>

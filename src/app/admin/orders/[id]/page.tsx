@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState, LoadingState } from "@/components/shared/states";
 import { PageHeader } from "@/features/admin/components/page-header";
 import { StatusBadge } from "@/features/admin/components/status-badge";
@@ -21,36 +20,38 @@ import {
   useAdminOrder, useAdminOrderTimeline, useAdminOrderMutations, useAdminUsers,
 } from "@/features/admin/admin-hooks";
 import { usePaymentsByOrder } from "@/features/payments/payments-hooks";
-import { formatNaira, formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, koboToNaira, nairaToKobo } from "@/lib/format";
 import { API_ROOT } from "@/lib/env";
-import { AdminUser } from "@/features/admin/admin-types";
-import { asArray } from "@/lib/utils";
+import type { OrderStatus } from "@/types/models";
 
-const ORDER_STATUSES = ["Pending", "Processing", "Paid", "Shipped", "Delivered", "Cancelled", "Refunded"];
+const ORDER_STATUSES: OrderStatus[] = [
+  "Pending", "AwaitingPayment", "Paid", "Processing", "Packed", "Shipped",
+  "Delivered", "Completed", "Cancelled", "RefundPending", "Refunded", "Failed",
+];
 
 export default function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: order, isLoading, isError, refetch } = useAdminOrder(id);
   const timeline = useAdminOrderTimeline(id);
-  const payments = usePaymentsByOrder(id);
+  const payment = usePaymentsByOrder(id);
   const m = useAdminOrderMutations(id);
 
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<OrderStatus | "">("");
   const [statusNote, setStatusNote] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
   const [note, setNote] = useState("");
   const [assignee, setAssignee] = useState("");
 
   if (isLoading) return <LoadingState label="Loading order…" />;
   if (isError || !order) return <ErrorState onRetry={() => refetch()} />;
 
-  const title = order.orderNumber ? `Order #${order.orderNumber}` : `Order ${order.id.slice(0, 8)}`;
-  const cancellable = !/cancel|refund|deliver/i.test(order.status ?? "");
+  const title = `Order #${order.orderNumber}`;
 
   return (
     <>
       <PageHeader
         title={title}
-        description={`Placed ${formatDate(order.createdAt)}`}
+        description={`Placed ${formatDate(order.placedAtUtc)}`}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Orders", href: "/admin/orders" }, { label: title }]}
         actions={
           <>
@@ -59,15 +60,9 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               className={buttonVariants({ variant: "outline", size: "sm" })}>
               <Download size={15} /> Invoice
             </a>
-            {cancellable && (
-              <ConfirmDialog
-                trigger={<Button size="sm" variant="ghost" className="text-destructive"><XCircle size={15} /> Cancel</Button>}
-                title="Cancel this order?"
-                description="The customer will be notified. This can't be undone."
-                actionLabel="Cancel order"
-                pending={m.cancel.isPending}
-                onConfirm={() => m.cancel.mutateAsync()}
-              />
+            {order.isCancellable && (
+              <CancelOrderDialog pending={m.cancel.isPending}
+                onConfirm={(reason) => m.cancel.mutate({ reason })} />
             )}
           </>
         }
@@ -75,9 +70,12 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <StatusBadge status={order.status} />
-        {order.paymentStatus && <StatusBadge status={order.paymentStatus} />}
-        {order.assignedToName && (
-          <span className="text-xs text-muted-foreground">Assigned to {order.assignedToName}</span>
+        <StatusBadge status={order.paymentStatus} />
+        {order.assignedStaffId && (
+          <span className="text-xs text-muted-foreground">Assigned to staff member {order.assignedStaffId.slice(0, 8)}</span>
+        )}
+        {order.trackingNumber && (
+          <span className="text-xs text-muted-foreground">Tracking: {order.trackingNumber}</span>
         )}
       </div>
 
@@ -87,32 +85,35 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           <Card><CardContent className="p-5">
             <h2 className="mb-4 font-bold tracking-tight">Items</h2>
             <ul className="divide-y divide-border">
-              {order.items?.map((it, i) => (
-                <li key={(it.productId ?? "") + i} className="flex gap-3 py-3">
+              {order.items.map((it) => (
+                <li key={it.id} className="flex gap-3 py-3">
                   <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted text-muted-foreground/40">
                     {it.imageUrl ? <img src={it.imageUrl} alt="" className="h-full w-full object-cover" /> : <Package size={19} />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{it.name ?? "Product"}</p>
+                    <p className="truncate text-sm font-medium">{it.productName}</p>
                     <p className="text-xs text-muted-foreground">
-                      Qty {it.quantity}{typeof it.unitPrice === "number" ? ` · ${formatNaira(it.unitPrice)}` : ""}
+                      Qty {it.quantity} · {it.unitPriceFormatted}
+                      {it.refundedQuantity > 0 && ` · ${it.refundedQuantity} refunded`}
                     </p>
                   </div>
-                  <span className="text-sm font-bold">
-                    {formatNaira(it.lineTotal ?? (it.unitPrice ?? 0) * it.quantity)}
-                  </span>
+                  <span className="text-sm font-bold">{it.totalFormatted}</span>
                 </li>
               ))}
             </ul>
 
             <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
-              {typeof order.subtotal === "number" && <Row label="Subtotal" value={formatNaira(order.subtotal)} />}
-              {typeof order.shipping === "number" && <Row label="Shipping" value={order.shipping === 0 ? "Free" : formatNaira(order.shipping)} />}
-              {typeof order.tax === "number" && <Row label="VAT" value={formatNaira(order.tax)} />}
+              <Row label="Subtotal" value={koboAsNaira(order.subtotalInKobo)} />
+              {order.discountInKobo > 0 && <Row label="Discount" value={`-${koboAsNaira(order.discountInKobo)}`} />}
+              <Row label="Delivery" value={order.deliveryFeeInKobo === 0 ? "Free" : koboAsNaira(order.deliveryFeeInKobo)} />
+              <Row label="VAT" value={koboAsNaira(order.vatInKobo)} />
               <div className="flex justify-between border-t border-border pt-2">
                 <dt className="font-semibold">Total</dt>
-                <dd className="text-lg font-extrabold">{formatNaira(order.total)}</dd>
+                <dd className="text-lg font-extrabold">{order.totalFormatted}</dd>
               </div>
+              <Row label="Paid" value={koboAsNaira(order.amountPaidInKobo)} />
+              {order.amountRefundedInKobo > 0 && <Row label="Refunded" value={koboAsNaira(order.amountRefundedInKobo)} />}
+              {order.outstandingBalanceInKobo > 0 && <Row label="Outstanding" value={koboAsNaira(order.outstandingBalanceInKobo)} />}
             </dl>
           </CardContent></Card>
 
@@ -121,29 +122,31 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <h2 className="mb-4 font-bold tracking-tight">Timeline</h2>
               <ol className="relative space-y-5 border-l border-border pl-5">
                 {timeline.data.map((t, i) => (
-                  <li key={i} className="relative">
+                  <li key={t.id} className="relative">
                     <span className={`absolute -left-[26px] top-1 h-3 w-3 rounded-full ${i === 0 ? "bg-primary ring-4 ring-primary/15" : "bg-border"}`} />
-                    <p className="text-sm font-semibold">{t.title ?? t.status}</p>
-                    {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
-                    <p className="text-xs text-muted-foreground">{formatDateTime(t.occurredAt ?? t.timestamp)}</p>
+                    <p className="text-sm font-semibold">{t.description}</p>
+                    {t.notes && <p className="text-sm text-muted-foreground">{t.notes}</p>}
+                    <p className="text-xs text-muted-foreground">
+                      {t.actorName ?? t.actorType} · {formatDateTime(t.occurredAtUtc)}
+                    </p>
                   </li>
                 ))}
               </ol>
             </CardContent></Card>
           )}
 
-          {/* Internal notes */}
+          {/* Notes */}
           <Card><CardContent className="p-5">
-            <h2 className="mb-3 font-bold tracking-tight">Internal notes</h2>
-            <p className="mb-3 text-xs text-muted-foreground">Only visible to your team — never shown to the customer.</p>
+            <h2 className="mb-3 font-bold tracking-tight">Notes</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Internal notes are never shown to the customer.</p>
 
-            {!!order.notes?.length && (
+            {!!order.notes.length && (
               <ul className="mb-4 space-y-2">
-                {order.notes.map((n, i) => (
-                  <li key={n.id ?? i} className="rounded-xl border border-border bg-muted/40 p-3">
-                    <p className="text-sm">{n.note}</p>
+                {order.notes.map((n) => (
+                  <li key={n.id} className="rounded-xl border border-border bg-muted/40 p-3">
+                    <p className="text-sm">{n.content}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {n.authorName ?? "Staff"} · {formatDateTime(n.createdAt)}
+                      {n.authorName ?? "Staff"} · {formatDateTime(n.createdAtUtc)} {n.isInternal ? "· Internal" : ""}
                     </p>
                   </li>
                 ))}
@@ -153,32 +156,35 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)}
               placeholder="Add a note for your team…" />
             <Button size="sm" className="mt-2" disabled={!note.trim() || m.addNote.isPending}
-              onClick={() => m.addNote.mutate({ note: note.trim() }, { onSuccess: () => setNote("") })}>
+              onClick={() => m.addNote.mutate({ content: note.trim(), isInternal: true }, { onSuccess: () => setNote("") })}>
               {m.addNote.isPending ? <><Spinner className="h-4 w-4" /> Saving…</> : <><MessageSquarePlus size={15} /> Add note</>}
             </Button>
           </CardContent></Card>
 
-          {!!payments.data?.length && (
+          {payment.data && (
             <Card><CardContent className="p-5">
-              <h2 className="mb-3 font-bold tracking-tight">Payment history</h2>
-              <ul className="divide-y divide-border text-sm">
-                {payments.data.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                    <div className="min-w-0">
-                      <Link href={`/admin/payments/${p.id}`} className="truncate font-medium hover:text-primary">
-                        {p.reference ?? p.id.slice(0, 12)}
-                      </Link>
-                      <p className="text-xs text-muted-foreground">
-                        {p.provider ?? "Flutterwave"} · {formatDateTime(p.createdAt)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge status={p.status} />
-                      <span className="font-bold">{formatNaira(p.amount)}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <h2 className="mb-3 font-bold tracking-tight">Payment</h2>
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <Link href={`/admin/payments/${payment.data.id}`} className="font-medium hover:text-primary">
+                  {payment.data.reference ?? payment.data.id.slice(0, 12)}
+                </Link>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={payment.data.status} />
+                  <span className="font-bold">{payment.data.amountFormatted}</span>
+                </div>
+              </div>
+              {!!payment.data.attempts.length && (
+                <ul className="divide-y divide-border text-sm">
+                  {payment.data.attempts.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between gap-2 py-2">
+                      <span className="text-muted-foreground">
+                        Attempt {a.attemptNumber} · {a.provider} · {formatDateTime(a.startedAtUtc)}
+                      </span>
+                      <StatusBadge status={a.status} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent></Card>
           )}
         </div>
@@ -188,61 +194,59 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           <Card><CardContent className="p-5">
             <h2 className="mb-3 font-bold tracking-tight">Update status</h2>
             <div className="space-y-2">
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger><SelectValue placeholder={order.status ?? "Select status"} /></SelectTrigger>
+              <Select value={status} onValueChange={(v) => setStatus(v as OrderStatus)}>
+                <SelectTrigger><SelectValue placeholder={order.status} /></SelectTrigger>
                 <SelectContent>
                   {ORDER_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Input value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="Note (optional)" />
+              {status === "Shipped" && (
+                <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="Tracking number" />
+              )}
               <Button size="sm" className="w-full" disabled={!status || m.updateStatus.isPending}
-                onClick={() => m.updateStatus.mutate(
-                  { status, note: statusNote || undefined },
-                  { onSuccess: () => { setStatus(""); setStatusNote(""); } }
+                onClick={() => status && m.updateStatus.mutate(
+                  { status, notes: statusNote || undefined, trackingNumber: trackingNumber || undefined },
+                  { onSuccess: () => { setStatus(""); setStatusNote(""); setTrackingNumber(""); } }
                 )}>
                 {m.updateStatus.isPending ? <><Spinner className="h-4 w-4" /> Updating…</> : "Update status"}
               </Button>
             </div>
           </CardContent></Card>
 
-          <AssignCard orderId={id} value={assignee} onChange={setAssignee}
-            onAssign={(userId) => m.assign.mutate({ userId })} pending={m.assign.isPending} />
+          <AssignCard value={assignee} onChange={setAssignee}
+            onAssign={(staffId) => m.assign.mutate({ staffId })} pending={m.assign.isPending} />
 
           <RecordPaymentCard
-            outstanding={order.total}
+            outstandingInKobo={order.outstandingBalanceInKobo}
             pending={m.recordPayment.isPending}
             onSubmit={(body) => m.recordPayment.mutate(body)}
           />
 
-          {order.shippingAddress && (
-            <Card><CardContent className="p-5">
-              <h2 className="mb-2 font-bold tracking-tight">Shipping address</h2>
-              <p className="text-sm font-medium">{order.shippingAddress.fullName}</p>
-              <p className="text-sm text-muted-foreground">
-                {[order.shippingAddress.line1, order.shippingAddress.line2, order.shippingAddress.city,
-                  order.shippingAddress.state, order.shippingAddress.country].filter(Boolean).join(", ")}
-              </p>
-              {order.shippingAddress.phoneNumber && (
-                <p className="text-sm text-muted-foreground">{order.shippingAddress.phoneNumber}</p>
-              )}
-            </CardContent></Card>
-          )}
+          <Card><CardContent className="p-5">
+            <h2 className="mb-2 font-bold tracking-tight">Shipping address</h2>
+            <p className="text-sm font-medium">{order.shippingAddress.recipientName}</p>
+            <p className="text-sm text-muted-foreground">{order.shippingAddress.formattedAddress}</p>
+            <p className="text-sm text-muted-foreground">{order.shippingAddress.phoneNumber}</p>
+          </CardContent></Card>
 
           <Card><CardContent className="p-5">
             <h2 className="mb-2 font-bold tracking-tight">Customer</h2>
             <p className="text-sm font-medium">{order.customerName ?? "—"}</p>
             <p className="truncate text-sm text-muted-foreground">{order.customerEmail}</p>
-            {order.customerId && (
-              <Link href={`/admin/customers/${order.customerId}`}
-                className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3 w-full" })}>
-                View customer
-              </Link>
-            )}
+            <Link href={`/admin/customers/${order.userId}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3 w-full" })}>
+              View customer
+            </Link>
           </CardContent></Card>
         </aside>
       </div>
     </>
   );
+}
+
+function koboAsNaira(kobo: number): string {
+  return `₦${koboToNaira(kobo).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -253,9 +257,40 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CancelOrderDialog({ onConfirm, pending }: { onConfirm: (reason: string) => void; pending?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setOpen(true)}>
+        <XCircle size={15} /> Cancel
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel this order?</DialogTitle>
+            <DialogDescription>The customer will be notified. This can&apos;t be undone.</DialogDescription>
+          </DialogHeader>
+          <Field label="Reason for cancellation">
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} autoFocus placeholder="Out of stock, customer request…" />
+          </Field>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Keep order</Button>
+            <Button variant="destructive" disabled={!reason.trim() || pending}
+              onClick={() => { onConfirm(reason.trim()); setOpen(false); setReason(""); }}>
+              {pending ? <><Spinner className="h-4 w-4" /> Cancelling…</> : "Cancel order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 /** Staff assignment — pulls the team list from /admin/users. */
 function AssignCard({ value, onChange, onAssign, pending }: {
-  orderId: string; value: string; onChange: (v: string) => void; onAssign: (userId: string) => void; pending?: boolean;
+  value: string; onChange: (v: string) => void; onAssign: (staffId: string) => void; pending?: boolean;
 }) {
   const { data } = useAdminUsers({ pageNumber: 1, pageSize: 100 });
   return (
@@ -265,10 +300,8 @@ function AssignCard({ value, onChange, onAssign, pending }: {
         <Select value={value} onValueChange={onChange}>
           <SelectTrigger><SelectValue placeholder="Select a team member" /></SelectTrigger>
           <SelectContent>
-          {asArray<AdminUser>(data?.items).map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.fullName ?? [u.firstName, u.lastName].filter(Boolean).join(" ") ?? u.email}
-              </SelectItem>
+            {(data?.items ?? []).map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.fullName}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -282,8 +315,10 @@ function AssignCard({ value, onChange, onAssign, pending }: {
 }
 
 /** Manual/offline payment capture via POST /admin/orders/{id}/payments. */
-function RecordPaymentCard({ outstanding, onSubmit, pending }: {
-  outstanding?: number; onSubmit: (b: { amount: number; reference?: string; method?: string; note?: string }) => void; pending?: boolean;
+function RecordPaymentCard({ outstandingInKobo, onSubmit, pending }: {
+  outstandingInKobo?: number;
+  onSubmit: (b: { amountInKobo: number; paymentReference?: string; paymentMethod?: string }) => void;
+  pending?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -312,7 +347,7 @@ function RecordPaymentCard({ outstanding, onSubmit, pending }: {
           <div className="space-y-3">
             <Field label="Amount (₦)">
               <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)}
-                placeholder={outstanding ? String(outstanding) : "0"} autoFocus />
+                placeholder={outstandingInKobo ? String(koboToNaira(outstandingInKobo)) : "0"} autoFocus />
             </Field>
             <Field label="Method">
               <Input value={method} onChange={(e) => setMethod(e.target.value)} placeholder="Bank transfer, cash…" />
@@ -326,7 +361,11 @@ function RecordPaymentCard({ outstanding, onSubmit, pending }: {
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button disabled={!amount || Number(amount) <= 0 || pending}
               onClick={() => {
-                onSubmit({ amount: Number(amount), reference: reference || undefined, method: method || undefined });
+                onSubmit({
+                  amountInKobo: nairaToKobo(Number(amount)),
+                  paymentReference: reference || undefined,
+                  paymentMethod: method || undefined,
+                });
                 setOpen(false); setAmount(""); setReference(""); setMethod("");
               }}>
               {pending ? <><Spinner className="h-4 w-4" /> Saving…</> : "Record payment"}

@@ -96,7 +96,7 @@ export default function AdminCategoriesPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(c)}><Pencil size={14} /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => m.setStatus.mutate({ id: c.id, body: { isActive: false } })}>
+                        <DropdownMenuItem onClick={() => m.setStatus.mutate({ id: c.id, isActive: c.status !== "Active" })}>
                           <Power size={14} /> Toggle status
                         </DropdownMenuItem>
                         <DropdownMenuItem destructive onSelect={(e) => e.preventDefault()} asChild>

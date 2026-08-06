@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/shared/field";
 import { Spinner } from "@/components/ui/spinner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -16,7 +17,13 @@ import { ErrorState, LoadingState } from "@/components/shared/states";
 import { PageHeader } from "@/features/admin/components/page-header";
 import { StatusBadge } from "@/features/admin/components/status-badge";
 import { useAdminPayment, usePaymentMutations } from "@/features/admin/admin-hooks";
-import { formatNaira, formatDateTime } from "@/lib/format";
+import { formatDateTime, koboToNaira, nairaToKobo } from "@/lib/format";
+import type { RefundReason } from "@/types/models";
+
+const REFUND_REASONS: RefundReason[] = [
+  "CustomerRequest", "OrderCancelled", "ItemOutOfStock", "DamagedOnArrival",
+  "WrongItemSent", "DeliveryFailed", "Duplicate", "Fraudulent", "Other",
+];
 
 export default function AdminPaymentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -24,19 +31,20 @@ export default function AdminPaymentDetailPage({ params }: { params: Promise<{ i
   const m = usePaymentMutations();
   const [refundOpen, setRefundOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<RefundReason | "">("");
+  const [notes, setNotes] = useState("");
 
   if (isLoading) return <LoadingState label="Loading payment…" />;
   if (isError || !payment) return <ErrorState onRetry={() => refetch()} />;
 
   const ref = payment.reference ?? payment.id.slice(0, 12);
-  const refundable = /success|paid|complete/i.test(payment.status ?? "");
+  const refundable = payment.refundableAmountInKobo > 0;
 
   return (
     <>
       <PageHeader
         title={`Payment ${ref}`}
-        description={`${payment.provider ?? "Flutterwave"} · ${formatDateTime(payment.createdAt)}`}
+        description={`${payment.provider ?? "Flutterwave"} · ${formatDateTime(payment.createdAtUtc)}`}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Payments", href: "/admin/payments" }, { label: ref }]}
         actions={
           <>
@@ -59,30 +67,48 @@ export default function AdminPaymentDetailPage({ params }: { params: Promise<{ i
             <Row label="Reference" value={payment.reference ?? "—"} />
             <Row label="Payment ID" value={payment.id} />
             <Row label="Provider" value={payment.provider ?? "Flutterwave"} />
-            <Row label="Method" value={payment.method ?? "—"} />
-            <Row label="Amount" value={formatNaira(payment.amount)} />
-            <Row label="Created" value={formatDateTime(payment.createdAt)} />
-            <Row label="Customer" value={payment.customerName ?? payment.customerEmail ?? "—"} />
+            <Row label="Channel" value={payment.paymentChannel ?? "—"} />
+            <Row label="Amount" value={payment.amountFormatted} />
+            <Row label="Paid" value={`₦${koboToNaira(payment.amountPaidInKobo).toLocaleString()}`} />
+            {payment.amountRefundedInKobo > 0 && (
+              <Row label="Refunded" value={`₦${koboToNaira(payment.amountRefundedInKobo).toLocaleString()}`} />
+            )}
+            <Row label="Created" value={formatDateTime(payment.createdAtUtc)} />
+            {payment.verifiedAtUtc && <Row label="Verified" value={formatDateTime(payment.verifiedAtUtc)} />}
+            {payment.failureReason && <Row label="Failure reason" value={payment.failureReason} />}
           </dl>
         </CardContent></Card>
 
         <aside className="space-y-4">
           <Card><CardContent className="p-5 text-center">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</p>
-            <p className="mt-1 text-3xl font-extrabold tracking-tight">{formatNaira(payment.amount)}</p>
+            <p className="mt-1 text-3xl font-extrabold tracking-tight">{payment.amountFormatted}</p>
             <div className="mt-3 flex justify-center"><StatusBadge status={payment.status} /></div>
           </CardContent></Card>
 
-          {payment.orderId && (
+          <Card><CardContent className="p-5">
+            <h2 className="mb-2 font-bold tracking-tight">Related order</h2>
+            <Link href={`/admin/orders/${payment.orderId}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}>
+              View order
+            </Link>
+          </CardContent></Card>
+
+          {!!payment.refunds.length && (
             <Card><CardContent className="p-5">
-              <h2 className="mb-2 font-bold tracking-tight">Related order</h2>
-              <p className="text-sm text-muted-foreground">
-                {payment.orderNumber ? `#${payment.orderNumber}` : payment.orderId.slice(0, 8)}
-              </p>
-              <Link href={`/admin/orders/${payment.orderId}`}
-                className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3 w-full" })}>
-                View order
-              </Link>
+              <h2 className="mb-3 font-bold tracking-tight">Refunds</h2>
+              <ul className="space-y-3 text-sm">
+                {payment.refunds.map((r) => (
+                  <li key={r.id} className="rounded-xl border border-border p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">{r.amountFormatted}</span>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{r.reason}{r.notes ? ` — ${r.notes}` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(r.requestedAtUtc)}</p>
+                  </li>
+                ))}
+              </ul>
             </CardContent></Card>
           )}
         </aside>
@@ -98,21 +124,31 @@ export default function AdminPaymentDetailPage({ params }: { params: Promise<{ i
           </DialogHeader>
           <div className="space-y-3">
             <Field label="Amount (₦)">
-              <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)}
-                placeholder={String(payment.amount ?? 0)} autoFocus />
+              <Input type="number" min={0} max={koboToNaira(payment.refundableAmountInKobo)}
+                value={amount} onChange={(e) => setAmount(e.target.value)}
+                placeholder={String(koboToNaira(payment.refundableAmountInKobo))} autoFocus />
             </Field>
             <Field label="Reason">
-              <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)}
-                placeholder="Why is this being refunded?" />
+              <Select value={reason} onValueChange={(v) => setReason(v as RefundReason)}>
+                <SelectTrigger><SelectValue placeholder="Select a reason" /></SelectTrigger>
+                <SelectContent>
+                  {REFUND_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Notes (optional)">
+              <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional context for the approver…" />
             </Field>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRefundOpen(false)}>Cancel</Button>
-            <Button disabled={!amount || Number(amount) <= 0 || m.createRefund.isPending}
+            <Button disabled={!amount || Number(amount) <= 0 || !reason || m.createRefund.isPending}
               onClick={() => {
+                if (!reason) return;
                 m.createRefund.mutate(
-                  { paymentId: id, amount: Number(amount), reason: reason || undefined },
-                  { onSuccess: () => { setRefundOpen(false); setAmount(""); setReason(""); } }
+                  { paymentId: id, amountInKobo: nairaToKobo(Number(amount)), reason, notes: notes || undefined },
+                  { onSuccess: () => { setRefundOpen(false); setAmount(""); setReason(""); setNotes(""); } }
                 );
               }}>
               {m.createRefund.isPending ? <><Spinner className="h-4 w-4" /> Submitting…</> : "Request refund"}

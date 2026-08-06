@@ -13,13 +13,18 @@ import { StatusBadge } from "@/features/admin/components/status-badge";
 import { ErrorState } from "@/components/shared/states";
 import {
   RevenueTrendChart, OrdersBarChart, GrowthLineChart,
-  HorizontalBarChart, DistributionPieChart,
+  HorizontalBarChart, DistributionPieChart, type ChartPoint,
 } from "@/features/admin/components/charts";
 import {
   useAdminDashboard, useSalesAnalytics, useCustomerAnalytics,
   useProductAnalytics, usePaymentAnalytics,
 } from "@/features/admin/admin-hooks";
-import { formatNaira, formatDate, formatDateTime } from "@/lib/format";
+import {
+  seriesToRevenue, seriesToCount, topProductsToRevenue, topCategoriesToRevenue,
+  topCustomersToSpend, recordToChartPoints,
+} from "@/features/admin/chart-helpers";
+import { formatDate, formatDateTime } from "@/lib/format";
+import type { RecentActivity, RecentCustomer, RecentOrder, RecentPayment } from "@/features/admin/admin-types";
 
 export default function AdminDashboardPage() {
   const { data, isLoading, isError, refetch } = useAdminDashboard();
@@ -37,11 +42,11 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const orderStatusData = [
-    { name: "Pending", value: data?.pendingOrders ?? 0 },
-    { name: "Completed", value: data?.completedOrders ?? 0 },
-    { name: "Cancelled", value: data?.cancelledOrders ?? 0 },
-  ].filter((d) => d.value > 0);
+  const orderStatusData: ChartPoint[] = [
+    { x: "Pending", y: data?.orders.pendingOrders ?? 0 },
+    { x: "Completed", y: data?.orders.completedOrders ?? 0 },
+    { x: "Cancelled", y: data?.orders.cancelledOrders ?? 0 },
+  ].filter((d) => d.y > 0);
 
   return (
     <>
@@ -58,51 +63,55 @@ export default function AdminDashboardPage() {
       {/* Primary metrics */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total revenue" loading={isLoading} icon={<Wallet size={18} />}
-          value={formatNaira(data?.totalRevenue)} delta={data?.revenueGrowth ?? null} hint="vs. previous period" />
+          value={data?.revenue.totalRevenueFormatted ?? "₦0"}
+          delta={sales.data?.growthPercentage != null ? Number(sales.data.growthPercentage) : null}
+          hint="vs. previous period" />
         <StatCard label="Today's revenue" loading={isLoading} icon={<TrendingUp size={18} />}
-          value={formatNaira(data?.todayRevenue)} tone="success" />
+          value={data?.revenue.revenueTodayFormatted ?? "₦0"} tone="success" />
         <StatCard label="Orders" loading={isLoading} icon={<ShoppingCart size={18} />}
-          value={(data?.totalOrders ?? 0).toLocaleString()} />
+          value={(data?.orders.totalOrders ?? 0).toLocaleString()} />
         <StatCard label="Average order value" loading={isLoading} icon={<Wallet size={18} />}
-          value={formatNaira(data?.averageOrderValue)} />
+          value={data?.orders.averageOrderValueFormatted ?? "₦0"} />
       </div>
 
       {/* Operational metrics */}
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Pending orders" loading={isLoading} icon={<Clock size={18} />} tone="warning"
-          value={(data?.pendingOrders ?? 0).toLocaleString()} />
+          value={(data?.orders.pendingOrders ?? 0).toLocaleString()} />
         <StatCard label="Completed" loading={isLoading} icon={<CheckCircle2 size={18} />} tone="success"
-          value={(data?.completedOrders ?? 0).toLocaleString()} />
+          value={(data?.orders.completedOrders ?? 0).toLocaleString()} />
         <StatCard label="Cancelled" loading={isLoading} icon={<Ban size={18} />} tone="danger"
-          value={(data?.cancelledOrders ?? 0).toLocaleString()} />
+          value={(data?.orders.cancelledOrders ?? 0).toLocaleString()} />
         <StatCard label="Customers" loading={isLoading} icon={<Users size={18} />}
-          value={(data?.totalCustomers ?? 0).toLocaleString()} />
+          value={(data?.customers.totalCustomers ?? 0).toLocaleString()} />
       </div>
 
       {/* Catalog health */}
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <StatCard label="Products" loading={isLoading} icon={<Package size={18} />}
-          value={(data?.totalProducts ?? 0).toLocaleString()} />
+          value={(data?.catalog.totalProducts ?? 0).toLocaleString()} />
         <StatCard label="Low stock" loading={isLoading} icon={<AlertTriangle size={18} />} tone="warning"
-          value={(data?.lowStockCount ?? 0).toLocaleString()} hint="Needs restocking" />
+          value={(data?.catalog.lowStockProducts ?? 0).toLocaleString()} hint="Needs restocking" />
         <StatCard label="Out of stock" loading={isLoading} icon={<XCircle size={18} />} tone="danger"
-          value={(data?.outOfStockCount ?? 0).toLocaleString()} hint="Unavailable to buy" />
+          value={(data?.catalog.outOfStockProducts ?? 0).toLocaleString()} hint="Unavailable to buy" />
       </div>
 
       {/* Charts */}
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="lg:col-span-2">
-          <RevenueTrendChart data={sales.data?.series} subtitle="Revenue over time" />
+          <RevenueTrendChart data={seriesToRevenue(sales.data?.series)} subtitle="Revenue over time" />
         </div>
-        <OrdersBarChart data={sales.data?.series} subtitle="Order volume by period" />
-        <GrowthLineChart data={customers.data?.series ?? customers.data?.growth} subtitle="New customers over time" />
-        <HorizontalBarChart title="Top selling products" subtitle="By units sold"
-          data={products.data?.topSelling ?? sales.data?.topProducts} />
+        <OrdersBarChart data={seriesToCount(sales.data?.series)} subtitle="Order volume by period" />
+        <GrowthLineChart data={seriesToCount(customers.data?.registrationSeries)} subtitle="New customers over time" />
+        <HorizontalBarChart title="Top selling products" subtitle="By revenue"
+          data={topProductsToRevenue(products.data?.topProducts)} currency />
         <HorizontalBarChart title="Sales by category" subtitle="Revenue contribution" currency
-          data={products.data?.byCategory ?? sales.data?.byCategory} />
+          data={topCategoriesToRevenue(products.data?.topCategories)} />
         <DistributionPieChart title="Payment distribution" subtitle="By provider"
-          data={payments.data?.byProvider ?? payments.data?.byStatus} currency />
+          data={recordToChartPoints(payments.data?.byProvider)} />
         <DistributionPieChart title="Order status" subtitle="Current breakdown" data={orderStatusData} />
+        <HorizontalBarChart title="Top customers" subtitle="By lifetime spend" currency
+          data={topCustomersToSpend(customers.data?.topCustomers)} />
       </div>
 
       {/* Recent activity */}
@@ -110,7 +119,7 @@ export default function AdminDashboardPage() {
         <RecentOrders orders={data?.recentOrders} loading={isLoading} />
         <RecentPayments payments={data?.recentPayments} loading={isLoading} />
         <RecentCustomers customers={data?.recentCustomers} loading={isLoading} />
-        <RecentActivity entries={data?.recentActivity} loading={isLoading} />
+        <RecentActivityPanel entries={data?.recentActivities} loading={isLoading} />
       </div>
     </>
   );
@@ -144,7 +153,7 @@ function Rows({ loading, empty, children }: { loading?: boolean; empty: boolean;
   return <ul className="divide-y divide-border">{children}</ul>;
 }
 
-function RecentOrders({ orders, loading }: { orders?: import("@/types/models").Order[]; loading?: boolean }) {
+function RecentOrders({ orders, loading }: { orders?: RecentOrder[]; loading?: boolean }) {
   return (
     <Panel title="Recent orders" href="/admin/orders">
       <Rows loading={loading} empty={!orders?.length}>
@@ -152,12 +161,12 @@ function RecentOrders({ orders, loading }: { orders?: import("@/types/models").O
           <li key={o.id}>
             <Link href={`/admin/orders/${o.id}`} className="flex items-center justify-between gap-3 py-2.5 hover:text-primary">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{o.orderNumber ? `#${o.orderNumber}` : o.id.slice(0, 8)}</p>
-                <p className="text-xs text-muted-foreground">{formatDate(o.createdAt)}</p>
+                <p className="truncate text-sm font-semibold">#{o.orderNumber}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(o.placedAtUtc)}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <StatusBadge status={o.status} />
-                <span className="text-sm font-bold">{formatNaira(o.total)}</span>
+                <span className="text-sm font-bold">{o.totalFormatted}</span>
               </div>
             </Link>
           </li>
@@ -167,7 +176,7 @@ function RecentOrders({ orders, loading }: { orders?: import("@/types/models").O
   );
 }
 
-function RecentPayments({ payments, loading }: { payments?: import("@/types/models").Payment[]; loading?: boolean }) {
+function RecentPayments({ payments, loading }: { payments?: RecentPayment[]; loading?: boolean }) {
   return (
     <Panel title="Recent payments" href="/admin/payments">
       <Rows loading={loading} empty={!payments?.length}>
@@ -175,11 +184,11 @@ function RecentPayments({ payments, loading }: { payments?: import("@/types/mode
           <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{p.reference ?? p.id.slice(0, 12)}</p>
-              <p className="text-xs text-muted-foreground">{p.provider ?? "Flutterwave"} · {formatDate(p.createdAt)}</p>
+              <p className="text-xs text-muted-foreground">{p.provider ?? "Flutterwave"} · {formatDate(p.createdAtUtc)}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <StatusBadge status={p.status} />
-              <span className="text-sm font-bold">{formatNaira(p.amount)}</span>
+              <span className="text-sm font-bold">{p.amountFormatted}</span>
             </div>
           </li>
         ))}
@@ -188,23 +197,17 @@ function RecentPayments({ payments, loading }: { payments?: import("@/types/mode
   );
 }
 
-function RecentCustomers({ customers, loading }: {
-  customers?: import("@/features/admin/admin-types").AdminCustomerSummary[]; loading?: boolean;
-}) {
+function RecentCustomers({ customers, loading }: { customers?: RecentCustomer[]; loading?: boolean }) {
   return (
     <Panel title="Recent customers" href="/admin/customers">
       <Rows loading={loading} empty={!customers?.length}>
         {customers?.slice(0, 5).map((c) => (
-          <li key={c.id}>
-            <Link href={`/admin/customers/${c.id}`} className="flex items-center justify-between gap-3 py-2.5 hover:text-primary">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {c.fullName ?? [c.firstName, c.lastName].filter(Boolean).join(" ") ?? c.email}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">{c.email}</p>
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground">{formatDate(c.createdAt)}</span>
-            </Link>
+          <li key={c.id} className="flex items-center justify-between gap-3 py-2.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{c.fullName}</p>
+              <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+            </div>
+            <span className="shrink-0 text-xs text-muted-foreground">{formatDate(c.registeredAtUtc)}</span>
           </li>
         ))}
       </Rows>
@@ -212,21 +215,19 @@ function RecentCustomers({ customers, loading }: {
   );
 }
 
-function RecentActivity({ entries, loading }: {
-  entries?: import("@/features/admin/admin-types").AuditLogEntry[]; loading?: boolean;
-}) {
+function RecentActivityPanel({ entries, loading }: { entries?: RecentActivity[]; loading?: boolean }) {
   return (
     <Panel title="Recent activity" href="/admin/audit-logs">
       <Rows loading={loading} empty={!entries?.length}>
         {entries?.slice(0, 6).map((a, i) => (
-          <li key={a.id ?? i} className="flex gap-3 py-2.5">
+          <li key={i} className="flex gap-3 py-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
             <div className="min-w-0">
               <p className="truncate text-sm">
-                <span className="font-medium">{a.actorName ?? a.actorEmail ?? "System"}</span>{" "}
-                <span className="text-muted-foreground">{a.description ?? a.action}</span>
+                <span className="font-medium">{a.actorEmail ?? "System"}</span>{" "}
+                <span className="text-muted-foreground">{a.action}</span>
               </p>
-              <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAt ?? a.createdAt)}</p>
+              <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAtUtc)}</p>
             </div>
           </li>
         ))}

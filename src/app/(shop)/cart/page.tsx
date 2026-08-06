@@ -6,7 +6,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { EmptyState, LoadingState } from "@/components/shared/states";
-import { formatNaira } from "@/lib/format";
 import { useCart } from "@/features/cart/use-cart";
 
 export default function CartPage() {
@@ -28,12 +27,7 @@ export default function CartPage() {
     );
   }
 
-  // Server cart carries authoritative totals; guest cart falls back to subtotal only.
-  const server = cart.serverCart;
-  const subtotal = server?.subtotal ?? cart.subtotal;
-  const tax = server?.tax;
-  const shipping = server?.shipping;
-  const total = server?.total ?? subtotal;
+  const server = cart.cart;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
@@ -62,14 +56,24 @@ export default function CartPage() {
                 </div>
 
                 <div className="flex min-w-0 flex-1 flex-col">
-                  {l.slug ? (
-                    <Link href={`/products/${l.slug}`} className="line-clamp-2 font-medium leading-snug hover:text-primary">
-                      {l.name}
+                  {l.productSlug ? (
+                    <Link href={`/products/${l.productSlug}`} className="line-clamp-2 font-medium leading-snug hover:text-primary">
+                      {l.productName}
                     </Link>
                   ) : (
-                    <p className="line-clamp-2 font-medium leading-snug">{l.name}</p>
+                    <p className="line-clamp-2 font-medium leading-snug">{l.productName}</p>
                   )}
-                  <p className="mt-1 text-sm text-muted-foreground">{formatNaira(l.unitPrice)} each</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{l.currentUnitPriceFormatted} each</p>
+                  {!l.isAvailable && (
+                    <p className="mt-1 text-xs font-medium text-destructive">
+                      {l.unavailableReason ?? "No longer available"}
+                    </p>
+                  )}
+                  {l.priceChanged && l.isAvailable && (
+                    <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                      Price {l.priceDifferenceInKobo < 0 ? "dropped" : "changed"} since you added this
+                    </p>
+                  )}
 
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
                     <QuantityStepper
@@ -78,7 +82,7 @@ export default function CartPage() {
                       disabled={cart.pending}
                     />
                     <div className="flex items-center gap-4">
-                      <span className="font-extrabold">{formatNaira(l.lineTotal)}</span>
+                      <span className="font-extrabold">{l.lineTotalFormatted}</span>
                       <button onClick={() => cart.remove(l.productId)} aria-label="Remove item"
                         className="text-destructive disabled:opacity-50" disabled={cart.pending}>
                         <Trash2 size={17} />
@@ -97,23 +101,24 @@ export default function CartPage() {
               <h2 className="mb-4 text-lg font-bold">Order Summary</h2>
 
               <dl className="space-y-2 text-sm">
-                <Row label="Subtotal" value={formatNaira(subtotal)} />
-                {typeof shipping === "number" && <Row label="Shipping" value={shipping === 0 ? "Free" : formatNaira(shipping)} />}
-                {typeof tax === "number" && <Row label="VAT" value={formatNaira(tax)} />}
+                <Row label="Subtotal" value={server?.subtotalFormatted ?? "—"} />
+                {server && <Row label="Delivery" value={server.deliveryFeeInKobo === 0 ? "Free" : server.deliveryFeeFormatted} />}
+                {server && <Row label="VAT" value={server.vatFormatted} />}
               </dl>
 
-              {typeof shipping !== "number" && typeof tax !== "number" && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Shipping and VAT are calculated at checkout.
-                </p>
-              )}
+              {server?.warnings.map((w) => (
+                <p key={w} className="mt-3 text-xs font-medium text-destructive">{w}</p>
+              ))}
 
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <span className="font-semibold">Total</span>
-                <span className="text-xl font-extrabold">{formatNaira(total)}</span>
+                <span className="text-xl font-extrabold">{server?.totalFormatted ?? "—"}</span>
               </div>
 
-              <Link href="/checkout" className={buttonVariants({ className: "mt-5 w-full" })}>
+              <Link href="/checkout" aria-disabled={server ? !server.isCheckoutReady : undefined}
+                className={buttonVariants({
+                  className: `mt-5 w-full ${server && !server.isCheckoutReady ? "pointer-events-none opacity-50" : ""}`,
+                })}>
                 Proceed to checkout <ArrowRight size={18} />
               </Link>
               <Link href="/" className={buttonVariants({ variant: "outline", className: "mt-2 w-full" })}>

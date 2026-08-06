@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useMemo } from "react";
 import Link from "next/link";
 import { Ban, CheckCircle2, Mail, MapPin, Phone, ShoppingCart, Wallet } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { StatCard } from "@/features/admin/components/stat-card";
 import { StatusBadge } from "@/features/admin/components/status-badge";
 import {
   useAdminCustomer, useAdminCustomerAddresses, useAdminCustomerActivity,
-  useAdminCustomerDashboard, useCustomerStatusMutation,
+  useAdminCustomerDashboard, useCustomerStatusMutation, useAdminOrders,
 } from "@/features/admin/admin-hooks";
-import { formatNaira, formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 export default function AdminCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -24,16 +24,14 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
   const activity = useAdminCustomerActivity(id);
   const dashboard = useAdminCustomerDashboard(id);
   const status = useCustomerStatusMutation(id);
+  const ordersQuery = useMemo(() => ({ customerId: id, pageNumber: 1, pageSize: 10 }), [id]);
+  const orders = useAdminOrders(ordersQuery);
 
   if (isLoading) return <LoadingState label="Loading customer…" />;
   if (isError || !customer) return <ErrorState onRetry={() => refetch()} />;
 
-  const name = customer.fullName
-    ?? [customer.firstName, customer.lastName].filter(Boolean).join(" ")
-    ?? customer.email
-    ?? "Customer";
-
-  const suspended = customer.isActive === false || /suspend|disabled|blocked/i.test(customer.status ?? "");
+  const name = customer.fullName || customer.email;
+  const suspended = customer.accountStatus === "Suspended";
 
   return (
     <>
@@ -53,7 +51,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
               description="The customer will be able to sign in and place orders again."
               actionLabel="Reactivate" destructive={false}
               pending={status.isPending}
-              onConfirm={() => status.mutateAsync({ status: "Active", isActive: true })}
+              onConfirm={() => status.mutateAsync({ isActive: true })}
             />
           ) : (
             <ConfirmDialog
@@ -62,24 +60,22 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
               description="The customer will be blocked from signing in and placing new orders. Existing orders are unaffected."
               actionLabel="Suspend account"
               pending={status.isPending}
-              onConfirm={() => status.mutateAsync({ status: "Suspended", isActive: false })}
+              onConfirm={() => status.mutateAsync({ isActive: false })}
             />
           )
         }
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <StatusBadge status={customer.status ?? (suspended ? "Suspended" : "Active")} />
-        {customer.createdAt && (
-          <span className="text-xs text-muted-foreground">Customer since {formatDate(customer.createdAt)}</span>
-        )}
+        <StatusBadge status={customer.accountStatus} />
+        <span className="text-xs text-muted-foreground">Customer since {formatDate(customer.createdAtUtc)}</span>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Orders" icon={<ShoppingCart size={18} />} loading={dashboard.isLoading}
-          value={(dashboard.data?.orderCount ?? customer.orderCount ?? 0).toLocaleString()} />
-        <StatCard label="Lifetime spend" icon={<Wallet size={18} />} loading={dashboard.isLoading}
-          value={formatNaira(dashboard.data?.totalSpent ?? customer.totalSpent)} />
+          value={(dashboard.data?.orderCount ?? 0).toLocaleString()} />
+        <StatCard label="Profile complete" icon={<Wallet size={18} />} loading={dashboard.isLoading}
+          value={`${dashboard.data?.profileCompletionPercentage ?? customer.profileCompletionPercentage}%`} />
         <StatCard label="Wishlist items" icon={<CheckCircle2 size={18} />} loading={dashboard.isLoading}
           value={dashboard.data?.wishlistCount ?? "—"} />
       </div>
@@ -95,22 +91,22 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
 
             <TabsContent value="orders">
               <Card><CardContent className="p-5">
-                {dashboard.isLoading ? (
+                {orders.isLoading ? (
                   <LoadingState />
-                ) : !dashboard.data?.recentOrders?.length ? (
+                ) : !orders.data?.items.length ? (
                   <EmptyState icon={<ShoppingCart size={26} />} title="No orders yet" />
                 ) : (
                   <ul className="divide-y divide-border">
-                    {dashboard.data.recentOrders.map((o) => (
+                    {orders.data.items.map((o) => (
                       <li key={o.id}>
                         <Link href={`/admin/orders/${o.id}`} className="flex items-center justify-between gap-3 py-3 hover:text-primary">
                           <div className="min-w-0">
-                            <p className="truncate font-semibold">{o.orderNumber ? `#${o.orderNumber}` : o.id.slice(0, 8)}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(o.createdAt)}</p>
+                            <p className="truncate font-semibold">#{o.orderNumber}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(o.placedAtUtc)}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <StatusBadge status={o.status} />
-                            <span className="font-bold">{formatNaira(o.total)}</span>
+                            <span className="font-bold">{o.totalFormatted}</span>
                           </div>
                         </Link>
                       </li>
@@ -131,12 +127,10 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
                     {addresses.data.map((a) => (
                       <li key={a.id} className="rounded-xl border border-border p-4">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="font-semibold">{a.fullName ?? "Address"}</p>
+                          <p className="font-semibold">{a.recipientName}</p>
                           {a.isDefault && <StatusBadge status="Default" />}
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {[a.line1, a.line2, a.city, a.state, a.postalCode, a.country].filter(Boolean).join(", ")}
-                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">{a.formattedAddress}</p>
                         {a.phoneNumber && <p className="text-sm text-muted-foreground">{a.phoneNumber}</p>}
                       </li>
                     ))}
@@ -149,15 +143,15 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
               <Card><CardContent className="p-5">
                 {activity.isLoading ? (
                   <LoadingState />
-                ) : !activity.data?.length ? (
+                ) : !activity.data?.items.length ? (
                   <EmptyState title="No recorded activity" />
                 ) : (
                   <ol className="relative space-y-4 border-l border-border pl-5">
-                    {activity.data.map((a, i) => (
-                      <li key={a.id ?? i} className="relative">
+                    {activity.data.items.map((a) => (
+                      <li key={a.id} className="relative">
                         <span className="absolute -left-[26px] top-1.5 h-2 w-2 rounded-full bg-accent" />
-                        <p className="text-sm font-medium">{a.description ?? a.type ?? "Activity"}</p>
-                        <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAt)}</p>
+                        <p className="text-sm font-medium">{a.description}</p>
+                        <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAtUtc)}</p>
                       </li>
                     ))}
                   </ol>
@@ -173,16 +167,15 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
             <ul className="space-y-2.5 text-sm">
               <li className="flex items-center gap-2.5">
                 <Mail size={15} className="shrink-0 text-muted-foreground" />
-                <a href={`mailto:${customer.email}`} className="truncate hover:text-primary">{customer.email ?? "—"}</a>
+                <a href={`mailto:${customer.email}`} className="truncate hover:text-primary">{customer.email}</a>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone size={15} className="shrink-0 text-muted-foreground" />
                 <span className="truncate">{customer.phoneNumber ?? "—"}</span>
               </li>
             </ul>
-            <Link href={`/admin/orders?search=${encodeURIComponent(customer.email ?? "")}`}
-              className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4 w-full" })}>
-              View all their orders
+            <Link href="/admin/orders" className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4 w-full" })}>
+              Search their orders
             </Link>
           </CardContent></Card>
         </aside>

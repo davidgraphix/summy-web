@@ -11,31 +11,33 @@ import { DataTable } from "@/features/admin/components/data-table";
 import { StatusBadge } from "@/features/admin/components/status-badge";
 import { FilterSelect, DateRangeFilter } from "@/features/admin/components/filter-select";
 import { useAdminPayments, usePaymentMutations } from "@/features/admin/admin-hooks";
-import { formatNaira, formatDateTime } from "@/lib/format";
-import type { AdminListQuery } from "@/features/admin/admin-api";
-import type { AdminPayment } from "@/features/admin/admin-types";
+import { formatDateTime } from "@/lib/format";
+import type { AdminPaymentQuery } from "@/features/admin/admin-api";
+import type { Payment, PaymentTransactionStatus } from "@/types/models";
 
-const PAYMENT_STATUSES = ["Pending", "Successful", "Failed", "Refunded", "Cancelled"];
+const PAYMENT_STATUSES: PaymentTransactionStatus[] = [
+  "Pending", "Initialized", "Processing", "Successful", "Failed", "Cancelled",
+  "Expired", "RefundPending", "Refunded", "Chargeback",
+];
 
 export default function AdminPaymentsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>();
+  const [status, setStatus] = useState<PaymentTransactionStatus>();
   const [range, setRange] = useState<{ from?: string; to?: string }>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const m = usePaymentMutations();
 
-  const query: AdminListQuery = useMemo(() => ({
+  const query: AdminPaymentQuery = useMemo(() => ({
     pageNumber: page, pageSize, search: search || undefined, status,
     from: range.from, to: range.to,
-    sort: sorting[0] ? `${sorting[0].id}_${sorting[0].desc ? "desc" : "asc"}` : undefined,
-  }), [page, pageSize, search, status, range, sorting]);
+  }), [page, pageSize, search, status, range]);
 
   const { data, isLoading, isFetching, isError, refetch } = useAdminPayments(query);
 
-  const columns = useMemo<ColumnDef<AdminPayment, unknown>[]>(() => [
+  const columns = useMemo<ColumnDef<Payment, unknown>[]>(() => [
     {
       id: "reference", header: "Reference",
       accessorFn: (p) => p.reference ?? p.id,
@@ -43,28 +45,23 @@ export default function AdminPaymentsPage() {
     },
     {
       id: "order", header: "Order", enableSorting: false,
-      accessorFn: (p) => p.orderNumber ?? "—",
-      cell: ({ row }) => row.original.orderId ? (
+      cell: ({ row }) => (
         <Link href={`/admin/orders/${row.original.orderId}`} onClick={(e) => e.stopPropagation()}
           className="text-primary hover:underline">
-          {row.original.orderNumber ? `#${row.original.orderNumber}` : "View order"}
+          View order
         </Link>
-      ) : <span className="text-muted-foreground">—</span>,
+      ),
     },
-    {
-      id: "customer", header: "Customer", enableSorting: false,
-      accessorFn: (p) => p.customerName ?? p.customerEmail ?? "—",
-    },
-    { id: "provider", header: "Provider", accessorFn: (p) => p.provider ?? p.method ?? "Flutterwave" },
-    { id: "createdAt", header: "Date", accessorFn: (p) => p.createdAt, cell: ({ row }) => formatDateTime(row.original.createdAt) },
+    { id: "provider", header: "Provider", accessorFn: (p) => p.provider ?? "Flutterwave" },
+    { id: "createdAtUtc", header: "Date", accessorFn: (p) => p.createdAtUtc, cell: ({ row }) => formatDateTime(row.original.createdAtUtc) },
     {
       id: "status", header: "Status", enableSorting: false,
       accessorFn: (p) => p.status,
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
-      id: "amount", header: "Amount", accessorFn: (p) => p.amount,
-      cell: ({ row }) => <span className="font-bold">{formatNaira(row.original.amount)}</span>,
+      id: "amount", header: "Amount", accessorFn: (p) => p.amountInKobo,
+      cell: ({ row }) => <span className="font-bold">{row.original.amountFormatted}</span>,
     },
     {
       id: "actions", header: "", enableSorting: false, enableHiding: false, size: 50,
@@ -91,7 +88,7 @@ export default function AdminPaymentsPage() {
         isLoading={isLoading} isFetching={isFetching} isError={isError} onRetry={() => refetch()}
         page={page} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={setPageSize}
         search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }}
-        searchPlaceholder="Search reference, customer…"
+        searchPlaceholder="Search reference…"
         sorting={sorting} onSortingChange={setSorting}
         getRowId={(p) => p.id}
         exportFileName="payments"
@@ -100,7 +97,7 @@ export default function AdminPaymentsPage() {
         emptyDescription="Transactions appear here once customers start paying."
         toolbar={
           <>
-            <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} label="Status"
+            <FilterSelect value={status} onChange={(v) => { setStatus(v as PaymentTransactionStatus | undefined); setPage(1); }} label="Status"
               placeholder="Any status" width="w-[150px]"
               options={PAYMENT_STATUSES.map((s) => ({ value: s, label: s }))} />
             <DateRangeFilter from={range.from} to={range.to} onChange={(r) => { setRange(r); setPage(1); }} />

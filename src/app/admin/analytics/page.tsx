@@ -1,33 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/features/admin/components/page-header";
 import { FilterSelect } from "@/features/admin/components/filter-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   RevenueTrendChart, OrdersBarChart, GrowthLineChart,
-  HorizontalBarChart, DistributionPieChart,
+  HorizontalBarChart, DistributionPieChart, type ChartPoint,
 } from "@/features/admin/components/charts";
 import {
   useSalesAnalytics, useCustomerAnalytics, useProductAnalytics, usePaymentAnalytics,
 } from "@/features/admin/admin-hooks";
+import {
+  seriesToRevenue, seriesToCount, topProductsToUnits, topCategoriesToRevenue,
+  topCustomersToSpend, recordToChartPoints,
+} from "@/features/admin/chart-helpers";
+import type { DateRangeQuery } from "@/features/admin/admin-types";
 
 const PERIODS = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "90d", label: "Last 90 days" },
-  { value: "12m", label: "Last 12 months" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+  { value: "365", label: "Last 12 months" },
 ];
 
 export default function AdminAnalyticsPage() {
-  // TODO: confirm the query-param name the analytics endpoints expect for range.
-  const [period, setPeriod] = useState<string | undefined>("30d");
-  const q = { period };
+  const [days, setDays] = useState<string | undefined>("30");
 
-  const sales = useSalesAnalytics(q);
-  const customers = useCustomerAnalytics(q);
-  const products = useProductAnalytics(q);
-  const payments = usePaymentAnalytics(q);
+  const range: DateRangeQuery = useMemo(() => {
+    if (!days) return {};
+    const to = new Date();
+    const from = new Date(to.getTime() - Number(days) * 24 * 60 * 60 * 1000);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, [days]);
+
+  const sales = useSalesAnalytics(range);
+  const customers = useCustomerAnalytics(range);
+  const products = useProductAnalytics(range);
+  const payments = usePaymentAnalytics(range);
+
+  const paymentOutcomeData: ChartPoint[] = [
+    { x: "Successful", y: payments.data?.successful ?? 0 },
+    { x: "Failed", y: payments.data?.failed ?? 0 },
+  ].filter((d) => d.y > 0);
 
   return (
     <>
@@ -36,7 +51,7 @@ export default function AdminAnalyticsPage() {
         description="Deeper reporting across sales, customers, products and payments."
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Analytics" }]}
         actions={
-          <FilterSelect value={period} onChange={setPeriod} placeholder="All time"
+          <FilterSelect value={days} onChange={setDays} placeholder="All time"
             label="Period" width="w-[170px]" options={PERIODS} />
         }
       />
@@ -50,31 +65,33 @@ export default function AdminAnalyticsPage() {
         </TabsList>
 
         <TabsContent value="sales" className="grid gap-4 lg:grid-cols-2">
-          <div className="lg:col-span-2"><RevenueTrendChart data={sales.data?.series} subtitle="Revenue over the selected period" /></div>
-          <OrdersBarChart data={sales.data?.series} subtitle="Order volume" />
+          <div className="lg:col-span-2">
+            <RevenueTrendChart data={seriesToRevenue(sales.data?.series)} subtitle="Revenue over the selected period" />
+          </div>
+          <OrdersBarChart data={seriesToCount(sales.data?.series)} subtitle="Order volume" />
           <HorizontalBarChart title="Sales by category" subtitle="Revenue contribution" currency
-            data={sales.data?.byCategory ?? products.data?.byCategory} />
+            data={topCategoriesToRevenue(products.data?.topCategories)} />
         </TabsContent>
 
         <TabsContent value="customers" className="grid gap-4 lg:grid-cols-2">
           <div className="lg:col-span-2">
-            <GrowthLineChart data={customers.data?.series ?? customers.data?.growth} subtitle="New customers over time" />
+            <GrowthLineChart data={seriesToCount(customers.data?.registrationSeries)} subtitle="New customers over time" />
           </div>
+          <HorizontalBarChart title="Top customers" subtitle="By lifetime spend" currency
+            data={topCustomersToSpend(customers.data?.topCustomers)} />
         </TabsContent>
 
         <TabsContent value="products" className="grid gap-4 lg:grid-cols-2">
           <HorizontalBarChart title="Top selling products" subtitle="By units sold"
-            data={products.data?.topSelling ?? sales.data?.topProducts} />
+            data={topProductsToUnits(products.data?.topProducts)} />
           <DistributionPieChart title="Sales by category" subtitle="Share of revenue" currency
-            data={products.data?.byCategory} />
+            data={topCategoriesToRevenue(products.data?.topCategories)} />
         </TabsContent>
 
         <TabsContent value="payments" className="grid gap-4 lg:grid-cols-2">
-          <DistributionPieChart title="By provider" subtitle="Payment volume" currency data={payments.data?.byProvider} />
-          <DistributionPieChart title="By status" subtitle="Transaction outcomes" data={payments.data?.byStatus} />
-          <div className="lg:col-span-2">
-            <RevenueTrendChart data={payments.data?.series} title="Payment volume" subtitle="Processed over time" />
-          </div>
+          <DistributionPieChart title="By provider" subtitle="Attempt volume"
+            data={recordToChartPoints(payments.data?.byProvider)} />
+          <DistributionPieChart title="Outcomes" subtitle="Successful vs failed" data={paymentOutcomeData} />
         </TabsContent>
       </Tabs>
     </>

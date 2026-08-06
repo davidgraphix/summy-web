@@ -17,7 +17,7 @@ import { ErrorState, LoadingState } from "@/components/shared/states";
 import { PageHeader } from "@/features/admin/components/page-header";
 import { useAdminSettings, useSettingsMutations } from "@/features/admin/admin-hooks";
 import type {
-  CompanySettings, ContactSettings, MaintenanceSettings, SeoSettings, SocialSettings,
+  AdminSettings, CompanySettings, ContactSettings, MaintenanceSettings, SeoSettings, SocialSettings,
 } from "@/features/admin/admin-types";
 
 export default function AdminSettingsPage() {
@@ -26,6 +26,7 @@ export default function AdminSettingsPage() {
 
   if (isLoading) return <LoadingState label="Loading settings…" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (!data) return null;
 
   return (
     <>
@@ -46,63 +47,69 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="company">
           <SettingsForm<CompanySettings>
-            defaults={data?.company ?? {}} pending={m.company.isPending}
-            onSave={(v) => m.company.mutate(v)}
+            defaults={data} pending={m.company.isPending}
+            onSave={(v) => m.company.mutate({ ...v, companyName: v.companyName || data.companyName })}
             fields={[
-              { name: "name", label: "Company name", placeholder: "Summy Solution & Technology Ventures" },
+              { name: "companyName", label: "Company name", placeholder: "Summy Solution & Technology Ventures" },
+              { name: "legalName", label: "Legal name" },
               { name: "registrationNumber", label: "Registration number", placeholder: "BN-3217879" },
+              { name: "taxIdentificationNumber", label: "Tax ID (TIN)" },
               { name: "logoUrl", label: "Logo URL", placeholder: "https://res.cloudinary.com/…" },
-              { name: "currency", label: "Currency code", placeholder: "NGN" },
-              { name: "address", label: "Registered address", textarea: true },
             ]}
           />
         </TabsContent>
 
         <TabsContent value="contact">
           <SettingsForm<ContactSettings>
-            defaults={data?.contact ?? {}} pending={m.contact.isPending}
+            defaults={data} pending={m.contact.isPending}
             onSave={(v) => m.contact.mutate(v)}
             fields={[
-              { name: "email", label: "Public email", placeholder: "hello@summy.com" },
               { name: "supportEmail", label: "Support email", placeholder: "support@summy.com" },
-              { name: "phone", label: "Phone", placeholder: "0803 000 0000" },
-              { name: "whatsapp", label: "WhatsApp", placeholder: "+234 803 000 0000" },
-              { name: "address", label: "Store address", textarea: true },
+              { name: "salesEmail", label: "Sales email", placeholder: "sales@summy.com" },
+              { name: "primaryPhone", label: "Primary phone", placeholder: "0803 000 0000" },
+              { name: "secondaryPhone", label: "Secondary phone" },
+              { name: "whatsAppNumber", label: "WhatsApp", placeholder: "+234 803 000 0000" },
+              { name: "addressLine1", label: "Address line 1" },
+              { name: "addressLine2", label: "Address line 2" },
+              { name: "city", label: "City" },
+              { name: "state", label: "State" },
+              { name: "country", label: "Country" },
+              { name: "postalCode", label: "Postal code" },
             ]}
           />
         </TabsContent>
 
         <TabsContent value="social">
           <SettingsForm<SocialSettings>
-            defaults={data?.social ?? {}} pending={m.social.isPending}
+            defaults={data} pending={m.social.isPending}
             onSave={(v) => m.social.mutate(v)}
             fields={[
-              { name: "facebook", label: "Facebook", placeholder: "https://facebook.com/…" },
-              { name: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
-              { name: "twitter", label: "X / Twitter", placeholder: "https://x.com/…" },
-              { name: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@…" },
-              { name: "linkedin", label: "LinkedIn", placeholder: "https://linkedin.com/company/…" },
-              { name: "youtube", label: "YouTube", placeholder: "https://youtube.com/@…" },
+              { name: "facebookUrl", label: "Facebook", placeholder: "https://facebook.com/…" },
+              { name: "instagramUrl", label: "Instagram", placeholder: "https://instagram.com/…" },
+              { name: "twitterUrl", label: "X / Twitter", placeholder: "https://x.com/…" },
+              { name: "tikTokUrl", label: "TikTok", placeholder: "https://tiktok.com/@…" },
+              { name: "linkedInUrl", label: "LinkedIn", placeholder: "https://linkedin.com/company/…" },
+              { name: "youTubeUrl", label: "YouTube", placeholder: "https://youtube.com/@…" },
             ]}
           />
         </TabsContent>
 
         <TabsContent value="seo">
           <SettingsForm<SeoSettings>
-            defaults={data?.seo ?? {}} pending={m.seo.isPending}
+            defaults={data} pending={m.seo.isPending}
             onSave={(v) => m.seo.mutate(v)}
             hint="These defaults are used for storefront pages that don't set their own metadata."
             fields={[
-              { name: "metaTitle", label: "Default meta title", placeholder: "Summy — Electronics & appliances" },
-              { name: "metaDescription", label: "Default meta description", textarea: true },
-              { name: "metaKeywords", label: "Keywords", placeholder: "tv, fridge, air conditioner" },
-              { name: "ogImageUrl", label: "Social share image URL", placeholder: "https://…" },
+              { name: "defaultMetaTitle", label: "Default meta title", placeholder: "Summy — Electronics & appliances" },
+              { name: "defaultMetaDescription", label: "Default meta description", textarea: true },
+              { name: "defaultMetaKeywords", label: "Keywords", placeholder: "tv, fridge, air conditioner" },
+              { name: "defaultOgImageUrl", label: "Social share image URL", placeholder: "https://…" },
             ]}
           />
         </TabsContent>
 
         <TabsContent value="maintenance">
-          <MaintenanceForm defaults={data?.maintenance ?? {}} pending={m.maintenance.isPending}
+          <MaintenanceForm defaults={data} pending={m.maintenance.isPending}
             onSave={(v) => m.maintenance.mutate(v)} />
         </TabsContent>
       </Tabs>
@@ -122,19 +129,19 @@ function asText<T extends object>(source: T, key: keyof T & string): string {
 function SettingsForm<T extends object>({
   defaults, fields, onSave, pending, hint,
 }: {
-  defaults: T;
+  defaults: AdminSettings;
   fields: FieldDef<T>[];
   onSave: (values: T) => void;
   pending?: boolean;
   hint?: string;
 }) {
   const form = useForm<Record<string, string>>({
-    defaultValues: Object.fromEntries(fields.map((f) => [f.name, asText(defaults, f.name)])),
+    defaultValues: Object.fromEntries(fields.map((f) => [f.name, asText(defaults, f.name as keyof AdminSettings & string)])),
   });
 
   // Re-seed when settings arrive after first render.
   useEffect(() => {
-    form.reset(Object.fromEntries(fields.map((f) => [f.name, asText(defaults, f.name)])));
+    form.reset(Object.fromEntries(fields.map((f) => [f.name, asText(defaults, f.name as keyof AdminSettings & string)])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaults]);
 
@@ -168,15 +175,15 @@ function SettingsForm<T extends object>({
 }
 
 function MaintenanceForm({ defaults, onSave, pending }: {
-  defaults: MaintenanceSettings; onSave: (v: MaintenanceSettings) => void; pending?: boolean;
+  defaults: AdminSettings; onSave: (v: MaintenanceSettings) => void; pending?: boolean;
 }) {
-  const form = useForm<{ message: string; allowedIps: string }>({
-    defaultValues: { message: defaults.message ?? "", allowedIps: defaults.allowedIps ?? "" },
+  const form = useForm<{ message: string }>({
+    defaultValues: { message: defaults.maintenanceMessage ?? "" },
   });
-  const enabled = defaults.enabled ?? false;
+  const enabled = defaults.maintenanceMode;
 
   useEffect(() => {
-    form.reset({ message: defaults.message ?? "", allowedIps: defaults.allowedIps ?? "" });
+    form.reset({ message: defaults.maintenanceMessage ?? "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaults]);
 
@@ -206,17 +213,14 @@ function MaintenanceForm({ defaults, onSave, pending }: {
           actionLabel={enabled ? "Go live" : "Enable maintenance mode"}
           destructive={!enabled}
           pending={pending}
-          onConfirm={() => onSave({ ...form.getValues(), enabled: !enabled })}
+          onConfirm={() => onSave({ message: form.getValues().message || undefined, enabled: !enabled })}
         />
       </div>
 
-      <form onSubmit={form.handleSubmit((v) => onSave({ ...v, enabled }))} className="space-y-4">
+      <form onSubmit={form.handleSubmit((v) => onSave({ message: v.message || undefined, enabled }))} className="space-y-4">
         <Field label="Message shown to customers">
           <Textarea rows={3} placeholder="We'll be back shortly — we're making improvements."
             {...form.register("message")} />
-        </Field>
-        <Field label="Allowed IP addresses (comma separated)">
-          <Input placeholder="102.89.0.1, 41.58.0.1" {...form.register("allowedIps")} />
         </Field>
         <Button type="submit" disabled={pending}>
           {pending ? <><Spinner className="h-4 w-4" /> Saving…</> : <><Save size={15} /> Save settings</>}

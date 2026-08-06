@@ -8,68 +8,57 @@ import { DataTable } from "@/features/admin/components/data-table";
 import { StatusBadge } from "@/features/admin/components/status-badge";
 import { FilterSelect, DateRangeFilter } from "@/features/admin/components/filter-select";
 import { useAdminOrders } from "@/features/admin/admin-hooks";
-import { formatNaira, formatDate } from "@/lib/format";
-import type { AdminListQuery } from "@/features/admin/admin-api";
-import type { AdminOrder } from "@/features/admin/admin-types";
+import { formatDate } from "@/lib/format";
+import type { AdminOrderQuery } from "@/features/admin/admin-api";
+import type { OrderStatus, OrderSummary } from "@/types/models";
 
-const ORDER_STATUSES = ["Pending", "Processing", "Paid", "Shipped", "Delivered", "Cancelled", "Refunded"];
+const ORDER_STATUSES: OrderStatus[] = [
+  "Pending", "AwaitingPayment", "Paid", "Processing", "Packed", "Shipped",
+  "Delivered", "Completed", "Cancelled", "RefundPending", "Refunded", "Failed",
+];
 
 export default function AdminOrdersPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>();
+  const [status, setStatus] = useState<OrderStatus>();
   const [range, setRange] = useState<{ from?: string; to?: string }>({});
   const [sorting, setSorting] = useState<SortingState>([]);
 
-  const query: AdminListQuery = useMemo(() => ({
+  const query: AdminOrderQuery = useMemo(() => ({
     pageNumber: page, pageSize,
     search: search || undefined,
-    status, from: range.from, to: range.to,
-    sort: sorting[0] ? `${sorting[0].id}_${sorting[0].desc ? "desc" : "asc"}` : undefined,
+    status, placedFrom: range.from, placedTo: range.to,
+    oldestFirst: sorting[0]?.id === "placedAtUtc" ? !sorting[0].desc : undefined,
   }), [page, pageSize, search, status, range, sorting]);
 
   const { data, isLoading, isFetching, isError, refetch } = useAdminOrders(query);
 
-  const columns = useMemo<ColumnDef<AdminOrder, unknown>[]>(() => [
+  const columns = useMemo<ColumnDef<OrderSummary, unknown>[]>(() => [
     {
       id: "orderNumber", header: "Order",
-      accessorFn: (o) => o.orderNumber ?? o.id,
-      cell: ({ row }) => (
-        <span className="font-semibold">
-          {row.original.orderNumber ? `#${row.original.orderNumber}` : row.original.id.slice(0, 8)}
-        </span>
-      ),
+      accessorFn: (o) => o.orderNumber,
+      cell: ({ row }) => <span className="font-semibold">#{row.original.orderNumber}</span>,
     },
     {
-      id: "customer", header: "Customer",
-      accessorFn: (o) => o.customerName ?? o.customerEmail ?? "—",
-      cell: ({ row }) => (
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{row.original.customerName ?? "—"}</p>
-          <p className="truncate text-xs text-muted-foreground">{row.original.customerEmail}</p>
-        </div>
-      ),
+      id: "placedAtUtc", header: "Date", accessorFn: (o) => o.placedAtUtc,
+      cell: ({ row }) => formatDate(row.original.placedAtUtc),
     },
-    { id: "createdAt", header: "Date", accessorFn: (o) => o.createdAt, cell: ({ row }) => formatDate(row.original.createdAt) },
-    {
-      id: "items", header: "Items", enableSorting: false,
-      accessorFn: (o) => o.items?.length ?? 0,
-    },
+    { id: "itemCount", header: "Items", enableSorting: false, accessorFn: (o) => o.itemCount },
     {
       id: "status", header: "Status", enableSorting: false,
       accessorFn: (o) => o.status,
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
-      id: "assignedTo", header: "Assigned", enableSorting: false,
-      accessorFn: (o) => o.assignedToName ?? "—",
-      cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.assignedToName ?? "Unassigned"}</span>,
+      id: "paymentStatus", header: "Payment", enableSorting: false,
+      accessorFn: (o) => o.paymentStatus,
+      cell: ({ row }) => <StatusBadge status={row.original.paymentStatus} />,
     },
     {
-      id: "total", header: "Total", accessorFn: (o) => o.total,
-      cell: ({ row }) => <span className="font-bold">{formatNaira(row.original.total)}</span>,
+      id: "total", header: "Total", accessorFn: (o) => o.totalInKobo,
+      cell: ({ row }) => <span className="font-bold">{row.original.totalFormatted}</span>,
     },
   ], []);
 
@@ -86,7 +75,7 @@ export default function AdminOrdersPage() {
         isLoading={isLoading} isFetching={isFetching} isError={isError} onRetry={() => refetch()}
         page={page} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={setPageSize}
         search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }}
-        searchPlaceholder="Search order number, customer…"
+        searchPlaceholder="Search order number…"
         sorting={sorting} onSortingChange={setSorting}
         getRowId={(o) => o.id}
         exportFileName="orders"
@@ -95,7 +84,7 @@ export default function AdminOrdersPage() {
         emptyDescription="Orders will appear here as customers check out."
         toolbar={
           <>
-            <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} label="Status"
+            <FilterSelect value={status} onChange={(v) => { setStatus(v as OrderStatus | undefined); setPage(1); }} label="Status"
               placeholder="Any status" width="w-[150px]"
               options={ORDER_STATUSES.map((s) => ({ value: s, label: s }))} />
             <DateRangeFilter from={range.from} to={range.to} onChange={(r) => { setRange(r); setPage(1); }} />

@@ -32,7 +32,7 @@ function Storefront() {
       brandId,
       categoryId: filters.categoryId,
       featured: filters.featured || undefined,
-      sort: filters.sort,
+      sortBy: filters.sortBy,
     }),
     [page, debounced, brandId, filters]
   );

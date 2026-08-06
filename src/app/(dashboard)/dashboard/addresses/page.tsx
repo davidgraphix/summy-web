@@ -26,15 +26,20 @@ export default function AddressesPage() {
   });
 
   const openNew = () => {
-    form.reset({ fullName: "", phoneNumber: "", line1: "", line2: "", city: "", state: "Lagos", postalCode: "", country: "Nigeria" });
+    form.reset({
+      recipientName: "", phoneNumber: "", streetAddress: "", apartmentSuite: "",
+      city: "", state: "Lagos", postalCode: "", country: "Nigeria",
+    });
     setEditing("new");
   };
 
   const openEdit = (a: Address) => {
     form.reset({
-      fullName: a.fullName ?? "", phoneNumber: a.phoneNumber ?? "",
-      line1: a.line1 ?? "", line2: a.line2 ?? "", city: a.city ?? "",
-      state: a.state ?? "Lagos", postalCode: a.postalCode ?? "", country: a.country ?? "Nigeria",
+      recipientName: a.recipientName, phoneNumber: a.phoneNumber,
+      streetAddress: a.streetAddress, apartmentSuite: a.apartmentSuite ?? "", city: a.city,
+      state: a.state, postalCode: a.postalCode ?? "", country: a.country,
+      localGovernment: a.localGovernment ?? "", landmark: a.landmark ?? "",
+      deliveryInstructions: a.deliveryInstructions ?? "",
     });
     setEditing(a);
   };
@@ -42,7 +47,7 @@ export default function AddressesPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       if (editing === "new") await m.create.mutateAsync(values);
-      else if (editing) await m.update.mutateAsync({ id: editing.id, body: values });
+      else if (editing) await m.update.mutateAsync({ id: editing.id, body: { ...values, isActive: true } });
       setEditing(null);
     } catch {
       // Toast already shown by the hook.
@@ -75,8 +80,8 @@ export default function AddressesPage() {
             </div>
 
             <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
-              <Field label="Full name" error={form.formState.errors.fullName?.message} className="sm:col-span-2">
-                <Input placeholder="Adaeze Okonkwo" {...form.register("fullName")} />
+              <Field label="Full name" error={form.formState.errors.recipientName?.message} className="sm:col-span-2">
+                <Input placeholder="Adaeze Okonkwo" {...form.register("recipientName")} />
               </Field>
               <Field label="Phone number" error={form.formState.errors.phoneNumber?.message}>
                 <Input inputMode="tel" placeholder="0803 000 0000" {...form.register("phoneNumber")} />
@@ -84,11 +89,11 @@ export default function AddressesPage() {
               <Field label="City" error={form.formState.errors.city?.message}>
                 <Input placeholder="Ikeja" {...form.register("city")} />
               </Field>
-              <Field label="Street address" error={form.formState.errors.line1?.message} className="sm:col-span-2">
-                <Input placeholder="12 Allen Avenue" {...form.register("line1")} />
+              <Field label="Street address" error={form.formState.errors.streetAddress?.message} className="sm:col-span-2">
+                <Input placeholder="12 Allen Avenue" {...form.register("streetAddress")} />
               </Field>
               <Field label="Apartment, suite (optional)" className="sm:col-span-2">
-                <Input placeholder="Flat 4B" {...form.register("line2")} />
+                <Input placeholder="Flat 4B" {...form.register("apartmentSuite")} />
               </Field>
               <Field label="State" error={form.formState.errors.state?.message}>
                 <select {...form.register("state")}
@@ -98,6 +103,12 @@ export default function AddressesPage() {
               </Field>
               <Field label="Postal code (optional)">
                 <Input placeholder="100001" {...form.register("postalCode")} />
+              </Field>
+              <Field label="Landmark (optional)">
+                <Input placeholder="Near First Bank" {...form.register("landmark")} />
+              </Field>
+              <Field label="Delivery instructions (optional)" className="sm:col-span-2">
+                <Input placeholder="Gate code, preferred time…" {...form.register("deliveryInstructions")} />
               </Field>
               <Field label="Country" error={form.formState.errors.country?.message} className="sm:col-span-2">
                 <Input {...form.register("country")} />
@@ -129,12 +140,10 @@ export default function AddressesPage() {
             <Card key={a.id}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold">{a.fullName ?? "Address"}</p>
+                  <p className="font-semibold">{a.recipientName}</p>
                   {a.isDefault && <Badge variant="accent">Default</Badge>}
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {[a.line1, a.line2, a.city, a.state, a.postalCode, a.country].filter(Boolean).join(", ")}
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{a.formattedAddress}</p>
                 {a.phoneNumber && <p className="text-sm text-muted-foreground">{a.phoneNumber}</p>}
 
                 <div className="mt-4 flex flex-wrap gap-2">
