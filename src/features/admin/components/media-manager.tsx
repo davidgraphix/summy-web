@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { GripVertical, ImageIcon, Star, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,7 +36,15 @@ export function MediaManager({ productId, slug }: { productId: string; slug?: st
 
   const accept = (files: FileList | null) => {
     if (!files?.length) return;
-    const valid = Array.from(files).filter((f) => f.type.startsWith("image/") && f.size <= MAX_BYTES);
+    const list = Array.from(files);
+    const valid = list.filter((f) => f.type.startsWith("image/") && f.size <= MAX_BYTES);
+    const rejected = list.filter((f) => !valid.includes(f));
+
+    for (const f of rejected) {
+      if (!f.type.startsWith("image/")) toast.error(`"${f.name}" isn't a recognized image file`);
+      else toast.error(`"${f.name}" is over 10MB`);
+    }
+
     if (valid.length) m.upload.mutate(valid);
   };
 

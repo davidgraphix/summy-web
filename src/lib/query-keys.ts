@@ -61,6 +61,7 @@ export const qk = {
     },
     customers: {
       all: ["admin", "customers"] as const,
+      list: (q: AdminListQuery) => ["admin", "customers", "list", q] as const,
       profile: (id: string) => ["admin", "customers", "profile", id] as const,
       addresses: (id: string) => ["admin", "customers", "addresses", id] as const,
       activity: (id: string) => ["admin", "customers", "activity", id] as const,
