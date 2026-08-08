@@ -18,7 +18,7 @@ import { ApiRequestError } from "@/lib/api-client";
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const redirect = params.get("redirect") || "/dashboard";
+  const explicitRedirect = params.get("redirect");
   const login = useLogin();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -26,8 +26,14 @@ function LoginForm() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await login.mutateAsync(values);
-      router.replace(redirect);
+      const session = await login.mutateAsync(values);
+      // Honor an explicit bounce-back target (the guards set this when they
+      // redirect an unauthenticated visit to a specific page). Otherwise send
+      // staff/admin accounts to the admin console and everyone else to the
+      // customer dashboard — the login response already carries userType, so
+      // this doesn't need a separate follow-up request.
+      const target = explicitRedirect || (session.user.userType !== "Customer" ? "/admin" : "/dashboard");
+      router.replace(target);
     } catch (e) {
       // Surface server-side field errors on the matching inputs.
       if (e instanceof ApiRequestError && e.validationErrors) {
@@ -77,7 +83,7 @@ function LoginForm() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           New to Summy?{" "}
-          <Link href={`/register?redirect=${encodeURIComponent(redirect)}`} className="font-semibold text-primary hover:underline">
+          <Link href={`/register?redirect=${encodeURIComponent(explicitRedirect || "/dashboard")}`} className="font-semibold text-primary hover:underline">
             Create an account
           </Link>
         </p>

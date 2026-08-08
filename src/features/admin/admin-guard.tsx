@@ -15,16 +15,21 @@ import { useAdminPrincipal, useHasPermission, type PermissionKey } from "./permi
  */
 export function AdminGuard({ children, permission }: { children: React.ReactNode; permission?: PermissionKey }) {
   const isAuth = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { isLoading, hasPrincipal, isStaff } = useAdminPrincipal();
   const allowed = useHasPermission(permission);
   const router = useRouter();
   const pathname = usePathname();
 
+  // Same hydration race as AuthGuard: a typed/bookmarked navigation to /admin
+  // is a full page load, so the store starts cold and only becomes
+  // authenticated once persist finishes reading localStorage. Redirecting
+  // before that finishes is what forces a second login.
   useEffect(() => {
-    if (!isAuth) router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
-  }, [isAuth, pathname, router]);
+    if (hasHydrated && !isAuth) router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+  }, [hasHydrated, isAuth, pathname, router]);
 
-  if (!isAuth) return <LoadingState label="Checking your session…" />;
+  if (!hasHydrated || !isAuth) return <LoadingState label="Checking your session…" />;
   if (isLoading || !hasPrincipal) return <LoadingState label="Verifying access…" />;
 
   if (!isStaff || !allowed) return <AccessDenied />;
