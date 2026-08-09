@@ -56,6 +56,19 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: STORAGE_KEY,
+      // zustand's automatic hydrate-on-store-creation call is unreliable in
+      // this app: `persist.hasHydrated()` (zustand's own internal flag, not
+      // just ours) was confirmed via direct testing to stay false forever on
+      // a real proportion of loads, while a manually-triggered
+      // `persist.rehydrate()` call completes correctly within milliseconds
+      // every time. This is a known zustand + Next.js "use client" module
+      // gotcha (the store module can be evaluated once during the
+      // server-render pass, where there is no localStorage, before the real
+      // client instance ever gets a chance to run its own hydrate() call).
+      // skipHydration + an explicit rehydrate() from a client-only mount
+      // effect (see app/providers.tsx) is zustand's own documented fix for
+      // this — not a timeout or a workaround.
+      skipHydration: true,
       onRehydrateStorage: () => () => {
         useAuthStore.setState({ hasHydrated: true });
       },
