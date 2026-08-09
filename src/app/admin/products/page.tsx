@@ -112,7 +112,9 @@ export default function AdminProductsPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild><Link href={`/admin/products/${p.id}`}><Pencil size={14} /> Edit</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <a href={`/products/${p.slug}`} target="_blank" rel="noopener noreferrer"><Eye size={14} /> Preview</a>
+                  <a href={`/products/${p.slug}`} target="_blank" rel="noopener noreferrer">
+                    <Eye size={14} /> Preview{!p.isPublished && " (unpublished)"}
+                  </a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {p.isPublished ? (

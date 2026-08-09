@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { strongPasswordSchema } from "@/lib/validators";
 
 export const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Enter a valid email"),
@@ -13,7 +14,7 @@ export const registerSchema = z
     email: z.string().email("Enter a valid email"),
     phoneNumber: z.string().optional(),
     referralCode: z.string().optional(),
-    password: z.string().min(8, "Use at least 8 characters"),
+    password: strongPasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((v) => v.password === v.confirmPassword, {
@@ -29,7 +30,7 @@ export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    newPassword: z.string().min(8, "Use at least 8 characters"),
+    newPassword: strongPasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((v) => v.newPassword === v.confirmPassword, {

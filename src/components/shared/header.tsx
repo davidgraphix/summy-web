@@ -55,7 +55,7 @@ export function Header() {
             className="h-10 w-full rounded-full border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary" />
         </form>
 
-        <Link href="/dashboard/notifications" className="relative hidden h-10 w-10 place-items-center rounded-full sm:grid" aria-label="Notifications">
+        <Link href="/dashboard/notifications" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full" aria-label="Notifications">
           <Bell size={19} />
           {unreadCount > 0 && (
             <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
@@ -64,7 +64,7 @@ export function Header() {
           )}
         </Link>
 
-        <div className="relative hidden sm:block" ref={menuRef}>
+        <div className="relative shrink-0" ref={menuRef}>
           <button onClick={() => (isAuth ? setMenu((v) => !v) : router.push("/login"))}
             className="grid h-10 w-10 place-items-center rounded-full" aria-label="Account">
             <User size={19} />
@@ -82,7 +82,7 @@ export function Header() {
           )}
         </div>
 
-        <button onClick={openCart} className="relative grid h-10 w-10 place-items-center rounded-full" aria-label="Cart">
+        <button onClick={openCart} className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full" aria-label="Cart">
           <ShoppingCart size={20} />
           {cart.count > 0 && (
             <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">

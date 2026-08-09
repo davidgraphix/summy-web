@@ -77,7 +77,7 @@ function RegisterForm() {
           <Field label="Password" error={form.formState.errors.password?.message}>
             <div className="relative">
               <Input type={showPassword ? "text" : "password"} autoComplete="new-password"
-                placeholder="At least 8 characters" className="pr-11" {...form.register("password")} />
+                placeholder="8+ chars, upper, lower, digit, symbol" className="pr-11" {...form.register("password")} />
               <button type="button" onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">

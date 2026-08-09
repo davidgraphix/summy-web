@@ -6,7 +6,7 @@ import { Providers } from "./providers";
 const sans = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans", weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
-  title: { default: "Summy — Shop electronics & appliances in Nigeria", template: "%s · Summy" },
+  title: { default: "Summy Solutions - Shop electronics & appliances in Nigeria", template: "%s · Summy" },
   description: "Genuine TVs, refrigerators, air conditioners and appliances with nationwide delivery. Summy Solution & Technology Ventures.",
   openGraph: { title: "Summy", type: "website", locale: "en_NG" },
 };

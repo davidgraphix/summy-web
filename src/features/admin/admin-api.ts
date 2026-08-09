@@ -102,6 +102,7 @@ export const adminPaymentsApi = {
 
 /* ------------------------------- Customers ------------------------------ */
 export const adminCustomersApi = {
+  list: (q: AdminListQuery = {}) => api.get<PagedResult<T.CustomerListItem>>("/admin/customers", { params: q }),
   profile: (id: string) => api.get<import("@/types/models").CustomerProfile>(`/admin/customers/${id}/profile`),
   addresses: (id: string) => api.get<T.Address[]>(`/admin/customers/${id}/addresses`),
   activity: (id: string, pageNumber = 1, pageSize = 20) =>

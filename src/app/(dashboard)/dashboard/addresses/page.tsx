@@ -13,7 +13,13 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/shared/states
 import { Spinner } from "@/components/ui/spinner";
 import { useAddresses, useAddressMutations } from "@/features/addresses/addresses-hooks";
 import { addressSchema, NG_STATES, type AddressValues } from "@/features/addresses/address-schema";
+import { ApiRequestError } from "@/lib/api-client";
 import type { Address } from "@/types/models";
+
+const ADDRESS_FIELDS = new Set<keyof AddressValues>([
+  "recipientName", "phoneNumber", "country", "state", "city", "localGovernment",
+  "streetAddress", "apartmentSuite", "postalCode", "landmark", "deliveryInstructions",
+]);
 
 export default function AddressesPage() {
   const { data: addresses, isLoading, isError, refetch } = useAddresses();
@@ -49,8 +55,15 @@ export default function AddressesPage() {
       if (editing === "new") await m.create.mutateAsync(values);
       else if (editing) await m.update.mutateAsync({ id: editing.id, body: { ...values, isActive: true } });
       setEditing(null);
-    } catch {
-      // Toast already shown by the hook.
+    } catch (e) {
+      // The hook already toasts the top-level message; this additionally
+      // pins field-specific failures onto the matching input.
+      if (e instanceof ApiRequestError && e.validationErrors) {
+        for (const { field, message } of e.validationErrors) {
+          const key = (field.charAt(0).toLowerCase() + field.slice(1)) as keyof AddressValues;
+          if (ADDRESS_FIELDS.has(key)) form.setError(key, { message });
+        }
+      }
     }
   });
 

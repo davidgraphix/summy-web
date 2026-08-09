@@ -1,10 +1,14 @@
 /** Centralised, validated access to public environment variables. */
 function required(name: string, value: string | undefined): string {
   if (!value) {
-    // Fail loudly in dev; fall back to a relative base in the browser so a
-    // reverse-proxy setup (API_PROXY_TARGET) still works.
+    // An empty apiBaseUrl is only ever safe in the browser, where buildUrl()
+    // resolves requests against the current origin — the local-dev proxy
+    // workflow (API_PROXY_TARGET in next.config.ts) depends on that. There is
+    // no such fallback during SSR, so warn loudly there; buildUrl() itself
+    // throws a descriptive error if a request is actually attempted server-
+    // side with this unset, rather than letting `new URL()` fail cryptically.
     if (typeof window === "undefined") {
-      console.warn(`[env] ${name} is not set.`);
+      console.warn(`[env] ${name} is not set. Server-side API requests will fail until it is.`);
     }
     return value ?? "";
   }

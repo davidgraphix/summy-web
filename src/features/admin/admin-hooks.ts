@@ -108,6 +108,9 @@ export function usePaymentMutations() {
 }
 
 /* ------------------------------- Customers ------------------------------ */
+export function useAdminCustomers(q: AdminListQuery) {
+  return useQuery({ queryKey: qk.admin.customers.list(q), queryFn: () => adminCustomersApi.list(q), placeholderData: keepPreviousData });
+}
 export function useAdminCustomer(id: string) {
   return useQuery({ queryKey: qk.admin.customers.profile(id), queryFn: () => adminCustomersApi.profile(id), enabled: !!id });
 }

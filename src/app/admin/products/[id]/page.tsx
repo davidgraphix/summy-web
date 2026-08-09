@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ExternalLink, Star, Trash2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Hint } from "@/components/ui/tooltip";
 import { PageHeader } from "@/features/admin/components/page-header";
 import { ProductForm, toProductRequest } from "@/features/admin/components/product-form";
 import { MediaManager } from "@/features/admin/components/media-manager";
@@ -45,10 +46,23 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         ]}
         actions={
           <>
-            <a href={`/products/${product.slug}`} target="_blank" rel="noopener noreferrer"
-              className={buttonVariants({ variant: "outline", size: "sm" })}>
-              <ExternalLink size={15} /> Preview
-            </a>
+            {published ? (
+              <a href={`/products/${product.slug}`} target="_blank" rel="noopener noreferrer"
+                className={buttonVariants({ variant: "outline", size: "sm" })}>
+                <ExternalLink size={15} /> Preview
+              </a>
+            ) : (
+              // Unpublished products 404 on the public product page by design
+              // (same response as a nonexistent slug, so shoppers can't probe
+              // for drafts) — let the admin click through if they want to
+              // confirm that, but explain it instead of leaving them guessing.
+              <Hint label="This product is unpublished, so the live page will show it as unavailable">
+                <a href={`/products/${product.slug}`} target="_blank" rel="noopener noreferrer"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  <ExternalLink size={15} /> Preview
+                </a>
+              </Hint>
+            )}
             <Button size="sm" variant="outline"
               onClick={() => m.setFeatured.mutate({ id, isFeatured: !product.isFeatured, slug: product.slug })}>
               <Star size={15} /> {product.isFeatured ? "Unfeature" : "Feature"}

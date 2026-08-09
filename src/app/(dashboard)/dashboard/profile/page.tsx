@@ -13,6 +13,7 @@ import { Field } from "@/components/shared/field";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState, LoadingState } from "@/components/shared/states";
 import { useProfile, useUpdateProfile, useUploadAvatar, useRemoveAvatar } from "@/features/customer/customer-hooks";
+import { ApiRequestError } from "@/lib/api-client";
 import { toast } from "sonner";
 
 const profileSchema = z.object({
@@ -47,7 +48,22 @@ export default function ProfilePage() {
     }
   }, [profile, form]);
 
-  const onSubmit = form.handleSubmit((values) => update.mutate(values));
+  const onSubmit = form.handleSubmit(async (values) => {
+    try {
+      await update.mutateAsync(values);
+    } catch (e) {
+      // The hook already toasts the top-level message; this additionally
+      // pins field-specific failures onto the matching input.
+      if (e instanceof ApiRequestError && e.validationErrors) {
+        for (const { field, message } of e.validationErrors) {
+          const key = field.charAt(0).toLowerCase() + field.slice(1);
+          if (key === "firstName" || key === "lastName" || key === "phoneNumber") {
+            form.setError(key, { message });
+          }
+        }
+      }
+    }
+  });
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

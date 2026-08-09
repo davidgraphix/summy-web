@@ -13,6 +13,8 @@ import { Field } from "@/components/shared/field";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState, LoadingState } from "@/components/shared/states";
 import { formatDateTime } from "@/lib/format";
+import { strongPasswordSchema } from "@/lib/validators";
+import { ApiRequestError } from "@/lib/api-client";
 import {
   useChangePassword, useSessions, useSessionMutations, useLoginHistory,
 } from "@/features/customer/account-hooks";
@@ -20,7 +22,7 @@ import {
 const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Enter your current password"),
-    newPassword: z.string().min(8, "Use at least 8 characters"),
+    newPassword: strongPasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((v) => v.newPassword === v.confirmPassword, {
@@ -49,8 +51,18 @@ export default function SecurityPage() {
         confirmPassword: values.confirmPassword,
       });
       form.reset();
-    } catch {
-      // Toast already shown by the hook.
+    } catch (e) {
+      // The hook already toasts the top-level message; this additionally
+      // pins field-specific failures (e.g. "must differ from current
+      // password") onto the matching input.
+      if (e instanceof ApiRequestError && e.validationErrors) {
+        for (const { field, message } of e.validationErrors) {
+          const key = field.charAt(0).toLowerCase() + field.slice(1);
+          if (key === "currentPassword" || key === "newPassword" || key === "confirmPassword") {
+            form.setError(key, { message });
+          }
+        }
+      }
     }
   });
 
@@ -76,7 +88,7 @@ export default function SecurityPage() {
             <Field label="New password" error={form.formState.errors.newPassword?.message}>
               <div className="relative">
                 <Input type={showPassword ? "text" : "password"} autoComplete="new-password"
-                  placeholder="At least 8 characters" className="pr-11" {...form.register("newPassword")} />
+                  placeholder="8+ chars, upper, lower, digit, symbol" className="pr-11" {...form.register("newPassword")} />
                 <button type="button" onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">

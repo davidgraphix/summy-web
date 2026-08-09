@@ -1,4 +1,4 @@
-import { API_ROOT } from "./env";
+import { API_ROOT, env } from "./env";
 import type { ApiEnvelope, ApiError } from "@/types/api";
 import { useAuthStore } from "@/features/auth/auth-store";
 import type { AuthenticationResponse } from "@/features/auth/auth-types";
@@ -38,7 +38,23 @@ interface RequestOptions {
 }
 
 function buildUrl(path: string, params?: RequestOptions["params"]): string {
-  const url = new URL(`${API_ROOT}${path.startsWith("/") ? path : `/${path}`}`);
+  const full = `${API_ROOT}${path.startsWith("/") ? path : `/${path}`}`;
+
+  // `env.apiBaseUrl` can be intentionally empty in the browser (relative
+  // requests through the local-dev rewrite proxy, see next.config.ts) — in
+  // that case `full` is a relative path, and `new URL()` needs a base to
+  // resolve it against, so pass the current origin. There is no equivalent
+  // fallback on the server: a relative path with no base throws a bare,
+  // unhelpful "Failed to construct 'URL': Invalid URL", so fail with a
+  // message that actually says what's missing.
+  const base = typeof window !== "undefined" ? window.location.origin : undefined;
+  if (!env.apiBaseUrl && !base) {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL is not configured — the API has no target host to send requests to."
+    );
+  }
+
+  const url = new URL(full, base);
   if (params) {
     for (const [key, value] of Object.entries(params as Record<string, QueryValue | QueryValue[]>)) {
       if (value === undefined || value === null) continue;

@@ -1,51 +1,90 @@
 "use client";
 
-import Link from "next/link";
-import { Search, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
+import { BadgeCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/features/admin/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { DataTable } from "@/features/admin/components/data-table";
+import { StatusBadge } from "@/features/admin/components/status-badge";
+import { useAdminCustomers } from "@/features/admin/admin-hooks";
+import { formatDate } from "@/lib/format";
+import type { AdminListQuery } from "@/features/admin/admin-api";
+import type { CustomerListItem } from "@/features/admin/admin-types";
 
-/**
- * NOTE ON DATA SOURCE
- * The backend has no customer *list* endpoint — AdminCustomersController only
- * exposes per-customer routes (/admin/customers/{id}/profile|addresses|activity|
- * dashboard|status), and AdminOrdersController.Search returns OrderSummaryDto,
- * which carries no customer name/email/id at all (only OrderDetailDto does).
- * There is therefore no way to build an accurate customer directory from the
- * current contract without an N+1 fetch of every order's full detail, which
- * isn't a real fix. This page is left as an honest placeholder rather than a
- * feature that quietly shows wrong or partial data — see the audit report for
- * the backend change needed (either a GET /admin/customers list endpoint, or
- * customer identity fields added to OrderSummaryDto).
- */
 export default function AdminCustomersPage() {
+  const router = useRouter();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [search, setSearch] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const query: AdminListQuery = useMemo(
+    () => ({ pageNumber: page, pageSize, search: search || undefined }),
+    [page, pageSize, search]
+  );
+
+  const { data, isLoading, isFetching, isError, refetch } = useAdminCustomers(query);
+
+  const columns = useMemo<ColumnDef<CustomerListItem, unknown>[]>(() => [
+    {
+      id: "name", header: "Customer",
+      accessorFn: (c) => c.fullName,
+      cell: ({ row }) => {
+        const c = row.original;
+        return (
+          <div className="min-w-0">
+            <p className="truncate font-medium">{c.fullName || "—"}</p>
+            <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+          </div>
+        );
+      },
+    },
+    {
+      id: "phoneNumber", header: "Phone", enableSorting: false,
+      accessorFn: (c) => c.phoneNumber,
+      cell: ({ row }) => row.original.phoneNumber || <span className="text-muted-foreground">—</span>,
+    },
+    {
+      id: "emailConfirmed", header: "Email", enableSorting: false,
+      accessorFn: (c) => c.emailConfirmed,
+      cell: ({ row }) => row.original.emailConfirmed
+        ? <Badge variant="success"><BadgeCheck size={13} /> Verified</Badge>
+        : <span className="text-sm text-muted-foreground">Unverified</span>,
+    },
+    {
+      id: "accountStatus", header: "Status", enableSorting: false,
+      accessorFn: (c) => c.accountStatus,
+      cell: ({ row }) => <StatusBadge status={row.original.accountStatus} />,
+    },
+    {
+      id: "createdAtUtc", header: "Joined", accessorFn: (c) => c.createdAtUtc,
+      cell: ({ row }) => formatDate(row.original.createdAtUtc),
+    },
+  ], []);
+
   return (
     <>
       <PageHeader
         title="Customers"
-        description="Customer directory"
+        description="Everyone with a storefront account."
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Customers" }]}
       />
 
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-muted text-muted-foreground">
-            <Users size={28} />
-          </div>
-          <div>
-            <p className="text-lg font-bold">No customer directory yet</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              The API doesn&apos;t expose a customer list endpoint, and order summaries don&apos;t carry
-              enough customer detail to build one reliably. Search Orders by customer name or email
-              instead, or open a specific customer&apos;s record if you already know their ID.
-            </p>
-          </div>
-          <Link href="/admin/orders" className={buttonVariants({ variant: "outline" })}>
-            <Search size={15} /> Search orders
-          </Link>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={columns} data={data}
+        isLoading={isLoading} isFetching={isFetching} isError={isError} onRetry={() => refetch()}
+        page={page} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={setPageSize}
+        search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search customers by name or email…"
+        sorting={sorting} onSortingChange={setSorting}
+        getRowId={(c) => c.id}
+        onRowClick={(c) => router.push(`/admin/customers/${c.id}`)}
+        exportFileName="customers"
+        emptyTitle="No customers yet"
+        emptyDescription="Customers show up here as soon as they create a storefront account."
+      />
     </>
   );
 }

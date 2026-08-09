@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ChevronLeft, Heart, Package, ShieldCheck, ShoppingCart, Truck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { LoadingState, ErrorState } from "@/components/shared/states";
@@ -14,11 +15,12 @@ import { useWishlistMutations } from "@/features/wishlist/wishlist-hooks";
 import { useAuthStore } from "@/features/auth/auth-store";
 import { cld } from "@/lib/cloudinary";
 import { useRouter } from "next/navigation";
+import { ApiRequestError } from "@/lib/api-client";
 import type { ProductVariant } from "@/types/models";
 
 export function ProductDetail({ slug }: { slug: string }) {
   const router = useRouter();
-  const { data: product, isLoading, isError, refetch } = useProduct(slug);
+  const { data: product, isLoading, isError, error, refetch } = useProduct(slug);
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [variantId, setVariantId] = useState<string | null>(null);
@@ -31,7 +33,26 @@ export function ProductDetail({ slug }: { slug: string }) {
   );
 
   if (isLoading) return <LoadingState label="Loading product…" />;
-  if (isError || !product) return <div className="mx-auto max-w-6xl px-4 py-10"><ErrorState onRetry={() => refetch()} /></div>;
+  if (isError || !product) {
+    // A 404 here means "not there to see" (removed, or not published yet —
+    // the API intentionally responds identically for both, so a shopper can't
+    // probe for draft slugs). Retrying a 404 just 404s again, so skip the
+    // retry button and point back at the shop instead.
+    const notFound = error instanceof ApiRequestError && error.status === 404;
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <ErrorState
+          message={notFound ? "This product isn't available. It may have been removed or isn't published yet." : undefined}
+          onRetry={notFound ? undefined : () => refetch()}
+        />
+        {notFound && (
+          <div className="mt-2 flex justify-center">
+            <Link href="/" className={buttonVariants({ variant: "outline" })}>Back to shop</Link>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // Variants are configured in the admin dashboard; when present the customer
   // picks one and its price/stock override the base product values.

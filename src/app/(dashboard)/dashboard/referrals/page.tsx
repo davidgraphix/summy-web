@@ -27,7 +27,7 @@ export default function ReferralsPage() {
       toast.success("Referral link copied");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Couldn't copy — select and copy the link manually");
+      toast.error("Couldn't copy select and copy the link manually");
     }
   };
 
@@ -92,7 +92,7 @@ export default function ReferralsPage() {
             <EmptyState
               icon={<Users size={28} />}
               title="No referrals yet"
-              description="Share your link — you'll see everyone who signs up here."
+              description="Share your link - you'll see everyone who signs up here."
             />
           ) : (
             <ul className="divide-y divide-border">

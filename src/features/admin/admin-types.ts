@@ -209,6 +209,20 @@ export type { Refund };
 /* ------------------------------ Customers ------------------------------ */
 export type { Address };
 
+/* ------------------------------ Customers -------------------------------- */
+/** Mirrors CustomerListItemDto — the admin Customers directory row shape. */
+export interface CustomerListItem {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  phoneNumber: string | null;
+  emailConfirmed: boolean;
+  accountStatus: string;
+  createdAtUtc: string;
+}
+
 /* -------------------------------- Users -------------------------------- */
 /** Mirrors AdminUserDto. Note: only a combined fullName is returned, never firstName/lastName. */
 export interface AdminUser {

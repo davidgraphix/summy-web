@@ -25,6 +25,8 @@ import { DataTable } from "@/features/admin/components/data-table";
 import { StatusBadge } from "@/features/admin/components/status-badge";
 import { useAdminUsers, useUserMutations, useRoles } from "@/features/admin/admin-hooks";
 import { formatDateTime } from "@/lib/format";
+import { strongPasswordSchema } from "@/lib/validators";
+import { ApiRequestError } from "@/lib/api-client";
 import type { AdminListQuery } from "@/features/admin/admin-api";
 import type { AdminUser } from "@/features/admin/admin-types";
 
@@ -32,7 +34,7 @@ const createSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "Use at least 8 characters"),
+  password: strongPasswordSchema,
 });
 type CreateValues = z.infer<typeof createSchema>;
 
@@ -66,13 +68,29 @@ export default function AdminUsersPage() {
       form.setError("root", { message: "Grant at least one role" });
       return;
     }
-    await m.create.mutateAsync({
-      firstName: values.firstName, lastName: values.lastName,
-      email: values.email, password: values.password, roles: createRoles,
-    });
-    setCreateOpen(false);
-    setCreateRoles([]);
-    form.reset();
+    try {
+      await m.create.mutateAsync({
+        firstName: values.firstName, lastName: values.lastName,
+        email: values.email, password: values.password, roles: createRoles,
+      });
+      setCreateOpen(false);
+      setCreateRoles([]);
+      form.reset();
+    } catch (e) {
+      // The mutation's own onError already toasts the top-level message —
+      // this additionally pins field-specific failures (e.g. password
+      // complexity) onto the matching input, same pattern as the login form.
+      if (e instanceof ApiRequestError && e.validationErrors) {
+        for (const { field, message } of e.validationErrors) {
+          const key = field.charAt(0).toLowerCase() + field.slice(1);
+          if (key === "firstName" || key === "lastName" || key === "email" || key === "password") {
+            form.setError(key, { message });
+          } else if (key === "roles") {
+            form.setError("root", { message });
+          }
+        }
+      }
+    }
   });
 
   const columns = useMemo<ColumnDef<AdminUser, unknown>[]>(() => [
@@ -198,7 +216,7 @@ export default function AdminUsersPage() {
               <Input type="email" {...form.register("email")} />
             </Field>
             <Field label="Temporary password" error={form.formState.errors.password?.message}>
-              <Input type="password" placeholder="At least 8 characters" {...form.register("password")} />
+              <Input type="password" placeholder="8+ chars, upper, lower, digit, symbol" {...form.register("password")} />
             </Field>
             <Field label="Roles" error={form.formState.errors.root?.message}>
               <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border p-2">
@@ -302,7 +320,7 @@ function RolesDialog({ user, roles, onClose, onSave, pending }: {
   );
 }
 
-const resetSchema = z.object({ newPassword: z.string().min(8, "Use at least 8 characters") });
+const resetSchema = z.object({ newPassword: strongPasswordSchema });
 type ResetValues = z.infer<typeof resetSchema>;
 
 function ResetPasswordDialog({ user, onClose, onSave, pending }: {
@@ -324,7 +342,7 @@ function ResetPasswordDialog({ user, onClose, onSave, pending }: {
         </DialogHeader>
         <form onSubmit={form.handleSubmit((v) => onSave(v.newPassword))} className="space-y-3">
           <Field label="New password" error={form.formState.errors.newPassword?.message}>
-            <Input type="password" autoFocus placeholder="At least 8 characters" {...form.register("newPassword")} />
+            <Input type="password" autoFocus placeholder="8+ chars, upper, lower, digit, symbol" {...form.register("newPassword")} />
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => { onClose(); form.reset(); }}>Cancel</Button>
