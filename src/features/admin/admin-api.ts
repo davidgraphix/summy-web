@@ -61,6 +61,8 @@ export interface ProductSearchQuery {
   inStockOnly?: boolean;
   featured?: boolean;
   tags?: string[];
+  /** Omit to search every status (the admin default); true/false scopes to published or drafts only. */
+  isPublished?: boolean;
   sortBy?: ProductSortBy;
   pageNumber?: number;
   pageSize?: number;

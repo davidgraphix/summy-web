@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
-  Eye, EyeOff, Info, MoreHorizontal, Package, Pencil, Plus, Star, Trash2, Upload,
+  Eye, EyeOff, MoreHorizontal, Package, Pencil, Plus, Star, Trash2, Upload,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -36,16 +37,19 @@ export default function AdminProductsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [categoryId, setCategoryId] = useState<string>();
   const [brandId, setBrandId] = useState<string>();
+  const [statusTab, setStatusTab] = useState<"all" | "published" | "draft">("all");
 
   const { data: categories } = useCategories();
   const { data: brands } = useBrands();
   const m = useProductMutations();
 
+  const isPublished = statusTab === "published" ? true : statusTab === "draft" ? false : undefined;
+
   const query: ProductSearchQuery = useMemo(() => ({
     pageNumber: page, pageSize,
     search: search || undefined,
-    categoryId, brandId,
-  }), [page, pageSize, search, categoryId, brandId]);
+    categoryId, brandId, isPublished,
+  }), [page, pageSize, search, categoryId, brandId, isPublished]);
 
   const { data, isLoading, isFetching, isError, refetch } = useAdminProducts(query);
 
@@ -168,13 +172,13 @@ export default function AdminProductsPage() {
         }
       />
 
-      <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
-        <Info size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
-        <p className="text-muted-foreground">
-          This list only shows published products — the search API is scoped to the live catalogue
-          server-side. Drafts and unpublished products aren&apos;t listed here yet.
-        </p>
-      </div>
+      <Tabs value={statusTab} onValueChange={(v) => { setStatusTab(v as typeof statusTab); setPage(1); }} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="all">All Products</TabsTrigger>
+          <TabsTrigger value="published">Published</TabsTrigger>
+          <TabsTrigger value="draft">Drafts</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <DataTable
         columns={columns}
