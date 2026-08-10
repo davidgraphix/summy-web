@@ -9,6 +9,9 @@ export const qk = {
   products: {
     all: ["products"] as const,
     list: (q: ProductQuery) => ["products", "list", q] as const,
+    /** Storefront infinite scroll. `q` carries the filters only — the page
+     *  number is the pageParam, so it must stay out of the key. */
+    infinite: (q: ProductQuery) => ["products", "infinite", q] as const,
     featured: ["products", "featured"] as const,
     bySlug: (slug: string) => ["products", "slug", slug] as const,
   },

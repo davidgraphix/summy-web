@@ -20,8 +20,8 @@ const SORTS: Array<[ProductSortBy | "", string]> = [
 ];
 
 export function ProductFilters({
-  state, onChange, totalCount,
-}: { state: FilterState; onChange: (next: FilterState) => void; totalCount?: number }) {
+  state, onChange,
+}: { state: FilterState; onChange: (next: FilterState) => void }) {
   const { data: categories } = useCategories();
 
   return (
@@ -29,9 +29,6 @@ export function ProductFilters({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">All Products</h1>
-          {typeof totalCount === "number" && (
-            <p className="text-sm text-muted-foreground">{totalCount.toLocaleString()} products available</p>
-          )}
         </div>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <SlidersHorizontal size={15} />
