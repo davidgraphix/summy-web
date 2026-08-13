@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Search, ShoppingCart, User } from "lucide-react";
+import { Bell, LogOut, ShoppingCart, User } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
+import { SearchBar } from "@/components/shared/search-bar";
 import { openCart } from "@/components/shared/cart-drawer";
 import { useCart } from "@/features/cart/use-cart";
 import { useAuthStore } from "@/features/auth/auth-store";
@@ -25,7 +26,6 @@ export function Header() {
   const isAuth = useAuthStore((s) => s.isAuthenticated);
   const logout = useLogout();
   const unread = useUnreadCount();
-  const [q, setQ] = useState("");
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,11 +35,6 @@ export function Header() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    router.push(q.trim() ? `/?search=${encodeURIComponent(q.trim())}` : "/");
-  };
-
   const unreadCount = unread.data?.unreadCount ?? 0;
 
   return (
@@ -48,17 +43,18 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
         <Logo className="shrink-0" />
 
-        <form onSubmit={submit} className="relative min-w-0 flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="Search TVs, fridges, brands…"
-            className="h-10 w-full rounded-full border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary" />
-        </form>
+        {/*
+          The one search control on the site. On phones it drops to a second row
+          rather than competing with the logo and three icon buttons for a
+          320px-wide strip — at that width an inline field left roughly 90px of
+          usable input and pushed the icons to 32px targets.
+        */}
+        <SearchBar className="hidden flex-1 sm:block" />
 
-        <Link href="/dashboard/notifications" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full" aria-label="Notifications">
+        <Link href="/dashboard/notifications" className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full" aria-label="Notifications">
           <Bell size={19} />
           {unreadCount > 0 && (
-            <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+            <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -66,7 +62,7 @@ export function Header() {
 
         <div className="relative shrink-0" ref={menuRef}>
           <button onClick={() => (isAuth ? setMenu((v) => !v) : router.push("/login"))}
-            className="grid h-10 w-10 place-items-center rounded-full" aria-label="Account">
+            className="grid h-11 w-11 place-items-center rounded-full" aria-label="Account">
             <User size={19} />
           </button>
           {isAuth && menu && (
@@ -82,14 +78,19 @@ export function Header() {
           )}
         </div>
 
-        <button onClick={openCart} className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full" aria-label="Cart">
+        <button onClick={openCart} className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full" aria-label="Cart">
           <ShoppingCart size={20} />
           {cart.count > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+            <span className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
               {cart.count}
             </span>
           )}
         </button>
+      </div>
+
+      {/* Second row on phones, so the field gets the full width. */}
+      <div className="px-3 pb-2.5 sm:hidden">
+        <SearchBar />
       </div>
     </header>
   );

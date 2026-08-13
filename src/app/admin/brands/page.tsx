@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { MoreHorizontal, Pencil, Plus, Tag, Trash2 } from "lucide-react";
+import {
+  Eye, EyeOff, Image as ImageIcon, ImageOff, MoreHorizontal, Pencil, Plus, Tag, Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,24 @@ import { useBrands } from "@/features/brands/brands-hooks";
 import { useBrandMutations } from "@/features/admin/admin-hooks";
 import type { Brand } from "@/types/models";
 
+/**
+ * Whether the brand is live on the storefront. The API models this as a status
+ * string rather than a boolean, so the comparison lives in one place instead of
+ * being spelled out at every call site.
+ */
+const isPublished = (brand: Brand) => brand.status === "Active";
+
+/** Logo tile with the initial-letter fallback the storefront also uses. */
+function BrandLogo({ brand }: { brand: Brand }) {
+  return (
+    <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted text-sm font-bold text-muted-foreground">
+      {brand.logoUrl
+        ? <img src={brand.logoUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
+        : brand.name.charAt(0)}
+    </div>
+  );
+}
+
 const schema = z.object({
   name: z.string().min(1, "Brand name is required"),
   slug: z.string().optional(),
@@ -36,6 +56,27 @@ export default function AdminBrandsPage() {
   const { data: brands, isLoading, isError, refetch } = useBrands();
   const m = useBrandMutations();
   const [editing, setEditing] = useState<Brand | "new" | null>(null);
+
+  // The brand whose logo is being replaced. Held here rather than per-card so a
+  // single hidden file input serves the whole grid.
+  const [logoTarget, setLogoTarget] = useState<Brand | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (logoTarget) fileRef.current?.click();
+  }, [logoTarget]);
+
+  const onFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const target = logoTarget;
+
+    // Reset immediately so picking the same file twice still fires a change
+    // event, and so a cancelled dialog does not leave the card armed.
+    e.target.value = "";
+    setLogoTarget(null);
+
+    if (file && target) await m.uploadLogo.mutateAsync({ id: target.id, file });
+  };
 
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", slug: "", description: "", websiteUrl: "" } });
 
@@ -81,13 +122,18 @@ export default function AdminBrandsPage() {
             {brands.map((b) => (
               <Card key={b.id}>
                 <CardContent className="flex items-start gap-3 p-4">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-muted text-sm font-bold text-muted-foreground">
-                    {b.logoUrl ? <img src={b.logoUrl} alt="" className="h-full w-full object-contain" /> : b.name.charAt(0)}
-                  </div>
+                  <BrandLogo brand={b} />
+
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{b.name}</p>
                     <p className="truncate text-xs text-muted-foreground">/{b.slug}</p>
+                    <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      isPublished(b) ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {isPublished(b) ? "Published" : "Unpublished"}
+                    </span>
                   </div>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${b.name}`}>
@@ -96,6 +142,31 @@ export default function AdminBrandsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => openEdit(b)}><Pencil size={14} /> Edit</DropdownMenuItem>
+
+                      <DropdownMenuItem onClick={() => setLogoTarget(b)}>
+                        <ImageIcon size={14} /> {b.logoUrl ? "Change logo" : "Upload logo"}
+                      </DropdownMenuItem>
+
+                      {b.logoUrl && (
+                        <DropdownMenuItem onClick={() => m.removeLogo.mutate(b.id)}>
+                          <ImageOff size={14} /> Remove logo
+                        </DropdownMenuItem>
+                      )}
+
+                      {/*
+                        Unpublishing is refused by the API while the brand still
+                        has published products — it returns the count and what to
+                        do about it, which is surfaced verbatim as a toast. The
+                        control stays enabled deliberately: a disabled button with
+                        no explanation is worse than an action that tells you why
+                        it cannot happen.
+                      */}
+                      <DropdownMenuItem
+                        onClick={() => m.setStatus.mutate({ id: b.id, isActive: !isPublished(b) })}
+                      >
+                        {isPublished(b) ? <><EyeOff size={14} /> Unpublish</> : <><Eye size={14} /> Publish</>}
+                      </DropdownMenuItem>
+
                       <DropdownMenuItem destructive onSelect={(e) => e.preventDefault()} asChild>
                         <ConfirmDialog
                           trigger={<button className="flex w-full items-center gap-2"><Trash2 size={14} /> Delete</button>}
@@ -113,6 +184,19 @@ export default function AdminBrandsPage() {
             ))}
           </div>
         )}
+
+      {/*
+        One shared file input for the whole grid. Accept list mirrors the API's
+        Media:AllowedContentTypes, so an unsupported file is rejected by the
+        picker rather than after a round trip.
+      */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif"
+        onChange={onFilePicked}
+        className="hidden"
+      />
 
       <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
         <DialogContent>

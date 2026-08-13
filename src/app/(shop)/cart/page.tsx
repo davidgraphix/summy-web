@@ -102,7 +102,20 @@ export default function CartPage() {
 
               <dl className="space-y-2 text-sm">
                 <Row label="Subtotal" value={server?.subtotalFormatted ?? "—"} />
-                {server && <Row label="Delivery" value={server.deliveryFeeInKobo === 0 ? "Free" : server.deliveryFeeFormatted} />}
+                {/*
+                  Delivery genuinely is not known yet: it depends on whether the
+                  customer collects or has it delivered, and to which state. Saying
+                  so is more honest than showing "Free" (which it may not be) or a
+                  fee they have not agreed to.
+                */}
+                {server && (
+                  <Row
+                    label="Delivery"
+                    value={server.deliveryPending
+                      ? "Calculated at checkout"
+                      : server.deliveryFeeInKobo === 0 ? "Free" : server.deliveryFeeFormatted}
+                  />
+                )}
                 {server && <Row label="VAT" value={server.vatFormatted} />}
               </dl>
 
@@ -110,10 +123,18 @@ export default function CartPage() {
                 <p key={w} className="mt-3 text-xs font-medium text-destructive">{w}</p>
               ))}
 
-              <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-                <span className="font-semibold">Total</span>
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+                <span className="font-semibold">
+                  {server?.deliveryPending ? "Subtotal + VAT" : "Total"}
+                </span>
                 <span className="text-xl font-extrabold">{server?.totalFormatted ?? "—"}</span>
               </div>
+
+              {server?.deliveryPending && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Choose store pickup or delivery at checkout to see your final total.
+                </p>
+              )}
 
               <Link href="/checkout" aria-disabled={server ? !server.isCheckoutReady : undefined}
                 className={buttonVariants({

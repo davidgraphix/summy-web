@@ -236,6 +236,15 @@ export const adminBrandsApi = {
   // isActive is a query param — SetStatus takes no request body.
   setStatus: (id: string, isActive: boolean) =>
     api.patch<void>(`/brands/${id}/status`, undefined, { params: { isActive } }),
+
+  /** Uploads or replaces the logo. Multipart, same pipeline as product media. */
+  uploadLogo: (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.postForm<Brand>(`/brands/${id}/logo`, form);
+  },
+
+  removeLogo: (id: string) => api.delete<Brand>(`/brands/${id}/logo`),
 };
 
 /* ---------------------------------- Media -------------------------------- */

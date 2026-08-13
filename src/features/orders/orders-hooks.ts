@@ -4,7 +4,38 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { qk } from "@/lib/query-keys";
 import { ordersApi, type OrderListQuery } from "./orders-api";
-import type { CreateOrderRequest } from "@/types/models";
+import type { CheckoutQuoteRequest, CreateOrderRequest } from "@/types/models";
+
+/**
+ * Live costing for the checkout page.
+ *
+ * Keyed on the delivery choice and destination, so switching between pickup and
+ * delivery, or changing state, re-quotes automatically and the displayed total
+ * is never a stale one. `enabled` keeps it quiet until there is actually
+ * something to price.
+ */
+export function useCheckoutQuote(request: CheckoutQuoteRequest | null) {
+  return useQuery({
+    queryKey: qk.orders.quote(request),
+    queryFn: () => ordersApi.quote(request!),
+    enabled: !!request && request.items.length > 0,
+
+    // A quote is a price the customer is about to act on. Refetch it rather
+    // than serving one that may predate a rate change.
+    staleTime: 0,
+  });
+}
+
+export function useDeliveryRates() {
+  return useQuery({
+    queryKey: qk.orders.deliveryRates,
+    queryFn: () => ordersApi.deliveryRates(),
+
+    // Staff change these rarely; an hour of caching avoids refetching a
+    // 37-row table on every checkout visit.
+    staleTime: 60 * 60_000,
+  });
+}
 
 export function useOrders(query: OrderListQuery = {}) {
   return useQuery({ queryKey: qk.orders.list(query.pageNumber ?? 1), queryFn: () => ordersApi.list(query) });

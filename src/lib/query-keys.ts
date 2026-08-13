@@ -25,6 +25,8 @@ export const qk = {
     list: (page: number) => ["orders", "list", page] as const,
     detail: (id: string) => ["orders", "detail", id] as const,
     timeline: (id: string) => ["orders", "timeline", id] as const,
+    quote: (request: unknown) => ["orders", "quote", request] as const,
+    deliveryRates: ["orders", "delivery-rates"] as const,
   },
   payments: { all: ["payments"] as const, byOrder: (id: string) => ["payments", "order", id] as const },
   customer: {

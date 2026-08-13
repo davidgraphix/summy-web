@@ -36,7 +36,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[240px_1fr]">
           {/* Mobile: horizontal scroller. Desktop: sticky sidebar. */}
           <nav className="lg:sticky lg:top-20 lg:self-start">
-            <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 lg:pb-0">
+            {/*
+              overscroll-x-contain stops a swipe that reaches the end of this
+              rail from chaining into the page and triggering browser
+              back-navigation; no-scrollbar hides the bar that would otherwise
+              sit across the tabs on desktop trackpads.
+            */}
+            <ul className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-2 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 lg:pb-0">
               {NAV.map(({ href, label, icon: Icon }) => {
                 const active = href === "/dashboard" ? pathname === href : pathname.startsWith(href);
                 return (

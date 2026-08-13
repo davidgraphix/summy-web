@@ -368,8 +368,28 @@ export function useBrandMutations() {
       onSuccess: () => { refresh(); toast.success("Brand updated"); }, onError }),
     remove: useMutation({ mutationFn: (id: string) => adminBrandsApi.remove(id),
       onSuccess: () => { refresh(); toast.success("Brand deleted"); }, onError }),
-    setStatus: useMutation({ mutationFn: (p: { id: string; isActive: boolean }) => adminBrandsApi.setStatus(p.id, p.isActive),
-      onSuccess: () => { refresh(); toast.success("Brand status updated"); }, onError }),
+    setStatus: useMutation({
+      mutationFn: (p: { id: string; isActive: boolean }) => adminBrandsApi.setStatus(p.id, p.isActive),
+      onSuccess: (_r, p) => {
+        refresh();
+        toast.success(p.isActive ? "Brand published" : "Brand unpublished");
+      },
+      // Deliberately not the generic handler. The backend refuses to unpublish
+      // a brand that still has live products and says how many; that message is
+      // the entire point of the rule, so it is shown in full and for longer than
+      // a default toast — an admin needs time to read a number and a next step.
+      onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
+    }),
+    uploadLogo: useMutation({
+      mutationFn: (p: { id: string; file: File }) => adminBrandsApi.uploadLogo(p.id, p.file),
+      onSuccess: () => { refresh(); toast.success("Logo updated"); },
+      onError,
+    }),
+    removeLogo: useMutation({
+      mutationFn: (id: string) => adminBrandsApi.removeLogo(id),
+      onSuccess: () => { refresh(); toast.success("Logo removed"); },
+      onError,
+    }),
   };
 }
 

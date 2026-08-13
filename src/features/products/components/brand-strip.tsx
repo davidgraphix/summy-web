@@ -111,8 +111,30 @@ export function BrandStrip({ activeBrandId, onPick }: { activeBrandId?: string; 
                 on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"
               )}
             >
-              <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs font-bold",
-                on ? "bg-white/20" : "bg-muted")}>{b.name.charAt(0)}</span>
+              {/*
+                The real logo when the brand has one, the initial when it does
+                not. `object-contain` on a padded tile rather than `object-cover`:
+                manufacturer logos are wordmarks of wildly different aspect
+                ratios, and cropping them to a square cuts the name in half.
+              */}
+              <span className={cn(
+                "grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-xl text-xs font-bold",
+                on ? "bg-white/20" : "bg-muted"
+              )}>
+                {b.logoUrl ? (
+                  <img
+                    src={b.logoUrl}
+                    alt=""
+                    width={32}
+                    height={32}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-contain p-0.5"
+                  />
+                ) : (
+                  b.name.charAt(0)
+                )}
+              </span>
               {b.name}
               {on && <X size={14} />}
             </button>

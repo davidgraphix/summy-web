@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import { BrandStrip } from "@/features/products/components/brand-strip";
 import { ProductFilters, type FilterState } from "@/features/products/components/product-filters";
@@ -10,32 +10,48 @@ import { EmptyState, ErrorState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
 import { useProductFeed } from "@/features/products/products-hooks";
 import { useBrands } from "@/features/brands/brands-hooks";
-import { useDebounce } from "@/hooks/use-debounce";
 
 const PAGE_SIZE = 24;
 
 function Storefront() {
   const params = useSearchParams();
-  const [search, setSearch] = useState(params.get("search") ?? "");
-  const debounced = useDebounce(search, 300);
+
+  // The URL is the single source of truth for the search term, written by the
+  // one SearchBar in the header. Reading it here (rather than keeping a second
+  // copy in state) is what makes header searches actually work: the previous
+  // version seeded useState from the URL once, so every search after the first
+  // updated the address bar and changed nothing on screen.
+  const search = params.get("search")?.trim() ?? "";
+
   const [brandId, setBrandId] = useState<string | undefined>();
   const [filters, setFilters] = useState<FilterState>({});
 
+  const router = useRouter();
   const { data: brands } = useBrands();
   const activeBrand = brands?.find((b) => b.id === brandId);
+
+  /** Resets every filter, including the URL-held search term. */
+  const clearAll = () => {
+    setBrandId(undefined);
+    setFilters({});
+    router.replace("/", { scroll: false });
+  };
 
   // No page number here: it is the feed's cursor, not a filter. Every value
   // below is part of the query key, so changing any of them starts a fresh
   // feed at page one automatically — there is no page state left to reset.
+  //
+  // The term arrives already debounced by the SearchBar, which owns that
+  // timing; debouncing again here would only add latency.
   const query = useMemo(
     () => ({
-      search: debounced || undefined,
+      search: search || undefined,
       brandId,
       categoryId: filters.categoryId,
       featured: filters.featured || undefined,
       sortBy: filters.sortBy,
     }),
-    [debounced, brandId, filters]
+    [search, brandId, filters]
   );
 
   const {
@@ -95,21 +111,28 @@ function Storefront() {
         activeBrandId={brandId}
         onPick={(id) => setBrandId(id ?? undefined)}
       />
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <div className="relative mb-5">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products or brands…"
-            className="h-11 w-full rounded-full border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary" />
-        </div>
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-6">
+        {/*
+          Active filters, shown as removable chips. Wraps rather than scrolls, so
+          nothing is hidden off the right edge on a narrow screen.
+        */}
+        {(search || activeBrand) && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Showing</span>
 
-        {activeBrand && (
-          <div className="mb-4 flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Filtered by</span>
-            <button onClick={() => setBrandId(undefined)}
-              className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-medium text-primary-foreground">
-              {activeBrand.name} <X size={13} />
-            </button>
+            {search && (
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted px-2.5 py-1 font-medium">
+                <span className="truncate">results for “{search}”</span>
+              </span>
+            )}
+
+            {activeBrand && (
+              <button onClick={() => setBrandId(undefined)}
+                aria-label={`Remove ${activeBrand.name} filter`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-medium text-primary-foreground">
+                {activeBrand.name} <X size={13} />
+              </button>
+            )}
           </div>
         )}
 
@@ -119,7 +142,9 @@ function Storefront() {
           <ErrorState onRetry={() => refetch()} />
         ) : (
           <>
-            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {/* gap-3 at 320-360px: gap-4 leaves each of two columns under 140px,
+                which crams the price and the add-to-cart button. */}
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
               {isLoading
                 ? Array.from({ length: PAGE_SIZE }).map((_, i) => <ProductCardSkeleton key={i} />)
                 : items.map((p) => <ProductCard key={p.id} product={p} />)}
@@ -128,9 +153,13 @@ function Storefront() {
             {!isLoading && items.length === 0 && (
               <EmptyState
                 icon={<Search size={30} />}
-                title="No products match your search"
-                description="Try a different keyword or clear your filters."
-                action={<Button variant="outline" onClick={() => { setSearch(""); setBrandId(undefined); setFilters({}); }}>Clear all filters</Button>}
+                title={search ? `No results for “${search}”` : "No products match your filters"}
+                description={
+                  search
+                    ? "Check the spelling, try a broader term such as “fridge” or “air conditioner”, or clear your filters."
+                    : "Try removing a filter to see more of the catalogue."
+                }
+                action={<Button variant="outline" onClick={clearAll}>Clear all filters</Button>}
               />
             )}
 

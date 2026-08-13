@@ -222,9 +222,12 @@ export interface Cart {
   distinctItemCount: number;
   totalQuantity: number;
   subtotalInKobo: number;
+  /** Always 0 in the cart — delivery is priced at checkout. See `deliveryPending`. */
   deliveryFeeInKobo: number;
   vatInKobo: number;
   totalInKobo: number;
+  /** True while delivery is unpriced, so the UI says "calculated at checkout". */
+  deliveryPending: boolean;
   subtotalFormatted: string;
   deliveryFeeFormatted: string;
   vatFormatted: string;
@@ -339,6 +342,7 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
   paymentMethod: OrderPaymentMethod;
+  deliveryMethod: DeliveryMethod;
   paymentReference: string | null;
   shippingAddress: OrderAddress;
   billingAddress: OrderAddress;
@@ -376,6 +380,9 @@ export interface CheckoutItem {
   variantId?: string;
 }
 
+/** How the customer receives the order. Mirrors the backend DeliveryMethod enum. */
+export type DeliveryMethod = "StorePickup" | "HomeDelivery";
+
 /** Mirrors CreateOrderRequest. */
 export interface CreateOrderRequest {
   items: CheckoutItem[];
@@ -384,7 +391,49 @@ export interface CreateOrderRequest {
   billingAddressId?: string;
   billingAddress?: OrderAddressInput;
   paymentMethod?: string;
+  /** Required — the backend rejects a checkout that has not chosen one. */
+  deliveryMethod: DeliveryMethod;
   customerNote?: string;
+}
+
+/** Mirrors CheckoutQuoteRequest. */
+export interface CheckoutQuoteRequest {
+  items: CheckoutItem[];
+  deliveryMethod: DeliveryMethod;
+  state?: string;
+  shippingAddressId?: string;
+}
+
+/**
+ * Mirrors CheckoutQuoteDto — the server's own costing of the basket.
+ *
+ * Every figure shown at checkout comes from here rather than being added up in
+ * the browser, so the amount on the pay button is by construction the amount
+ * that will be charged.
+ */
+export interface CheckoutQuote {
+  deliveryMethod: DeliveryMethod;
+  subtotalInKobo: number;
+  deliveryFeeInKobo: number;
+  vatInKobo: number;
+  totalInKobo: number;
+  subtotalFormatted: string;
+  deliveryFeeFormatted: string;
+  vatFormatted: string;
+  totalFormatted: string;
+  currency: string;
+  freeDeliveryApplied: boolean;
+  usedDefaultRate: boolean;
+}
+
+/** Mirrors DeliveryRateDto. */
+export interface DeliveryRate {
+  id: string;
+  state: string;
+  feeInKobo: number;
+  feeFormatted: string;
+  isActive: boolean;
+  notes: string | null;
 }
 
 /* -------------------------- Invoices & receipts ------------------------ */

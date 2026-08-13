@@ -149,7 +149,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <dl className="space-y-2 text-sm">
                 <SummaryRow label="Subtotal" value={`₦${(order.subtotalInKobo / 100).toLocaleString()}`} />
                 {order.discountInKobo > 0 && <SummaryRow label="Discount" value={`-₦${(order.discountInKobo / 100).toLocaleString()}`} />}
-                <SummaryRow label="Delivery" value={order.deliveryFeeInKobo === 0 ? "Free" : `₦${(order.deliveryFeeInKobo / 100).toLocaleString()}`} />
+                {/*
+                  Names the arrangement, not just the charge. "Delivery — Free"
+                  and "Store pickup — ₦0.00" cost the same and mean completely
+                  different things to someone waiting for a courier.
+                */}
+                <SummaryRow
+                  label={order.deliveryMethod === "StorePickup" ? "Delivery (store pickup)" : "Delivery"}
+                  value={
+                    order.deliveryMethod === "StorePickup"
+                      ? "₦0.00"
+                      : order.deliveryFeeInKobo === 0
+                        ? "Free"
+                        : `₦${(order.deliveryFeeInKobo / 100).toLocaleString()}`
+                  }
+                />
                 <SummaryRow label="VAT" value={`₦${(order.vatInKobo / 100).toLocaleString()}`} />
               </dl>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
