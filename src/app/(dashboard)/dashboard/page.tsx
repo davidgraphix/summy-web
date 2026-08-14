@@ -24,12 +24,18 @@ export default function DashboardPage() {
   if (isError) return <ErrorState onRetry={() => refetch()} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Hi, {greetingName} 👋</h1>
-        <p className="text-sm text-muted-foreground">Here&apos;s what&apos;s happening with your account.</p>
+        <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">Hi, {greetingName} 👋</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">Here&apos;s what&apos;s happening with your account.</p>
       </div>
 
+      {/*
+        Two columns from the narrowest phone up. At 320px that gives each card
+        ~146px, which comfortably fits the icon, label and figure; one column
+        would leave a card the width of the screen holding a single number, and
+        four would crush them.
+      */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat icon={<Package size={18} />} label="Orders"
           value={overview?.orderCount ?? orders.data?.totalCount ?? 0} />
@@ -42,10 +48,16 @@ export default function DashboardPage() {
       </div>
 
       <Card>
-        <CardContent className="p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold">Recent orders</h2>
-            <Link href="/dashboard/orders" className="text-sm font-medium text-primary hover:underline">View all</Link>
+        <CardContent className="p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+            <h2 className="text-base font-bold sm:text-lg">Recent orders</h2>
+            {/* -mr-2 keeps the enlarged tap area from pushing the card padding out. */}
+            <Link
+              href="/dashboard/orders"
+              className="-mr-2 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-primary hover:underline"
+            >
+              View all
+            </Link>
           </div>
 
           {recentOrders.length === 0 ? (
@@ -59,13 +71,18 @@ export default function DashboardPage() {
             <ul className="divide-y divide-border">
               {recentOrders.map((o) => (
                 <li key={o.id}>
+                  {/*
+                    min-w-0 + truncate on the left column: an order number and
+                    date must not push the status badge and total off the row on
+                    a narrow screen.
+                  */}
                   <Link href={`/dashboard/orders/${o.id}`}
-                    className="flex flex-wrap items-center justify-between gap-2 py-3 transition-colors hover:text-primary">
-                    <div>
-                      <p className="font-semibold">#{o.orderNumber}</p>
+                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-3 transition-colors hover:text-primary">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">#{o.orderNumber}</p>
                       <p className="text-sm text-muted-foreground">{formatDate(o.placedAtUtc)}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-3">
                       <OrderStatusBadge status={o.status} />
                       <span className="font-bold">{o.totalFormatted}</span>
                     </div>
@@ -79,14 +96,14 @@ export default function DashboardPage() {
 
       {!!activity?.items.length && (
         <Card>
-          <CardContent className="p-5">
-            <h2 className="mb-4 text-lg font-bold">Recent activity</h2>
+          <CardContent className="p-4 sm:p-5">
+            <h2 className="mb-3 text-base font-bold sm:mb-4 sm:text-lg">Recent activity</h2>
             <ul className="space-y-3">
               {activity.items.slice(0, 8).map((a) => (
                 <li key={a.id} className="flex gap-3 text-sm">
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
-                  <div>
-                    <p className="font-medium">{a.description}</p>
+                  <div className="min-w-0">
+                    <p className="break-words font-medium">{a.description}</p>
                     <p className="text-xs text-muted-foreground">{formatDateTime(a.occurredAtUtc)}</p>
                   </div>
                 </li>

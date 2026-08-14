@@ -33,9 +33,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen">
       <Header />
       <AuthGuard>
-        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[240px_1fr]">
-          {/* Mobile: horizontal scroller. Desktop: sticky sidebar. */}
-          <nav className="lg:sticky lg:top-20 lg:self-start">
+        <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:gap-6 sm:py-6 lg:grid-cols-[240px_1fr]">
+          {/*
+            min-w-0 is what keeps the whole dashboard inside the viewport.
+
+            A grid item defaults to `min-width: auto`, meaning it refuses to be
+            narrower than its own content. The tab rail below is a nowrap flex row
+            about 1150px wide; without this, that width became the grid column's
+            width, so at a 375px viewport the page canvas measured 1151px — the
+            entire dashboard laid itself out at desktop width and the browser
+            scrolled sideways over it. `overflow-x-auto` on the rail could not
+            help, because the rail was never the thing being constrained.
+
+            <main> already carried min-w-0. The nav did not, and in a
+            single-column grid both items share one column, so the nav alone was
+            enough to stretch everything.
+          */}
+          <nav className="min-w-0 lg:sticky lg:top-20 lg:self-start">
             {/*
               overscroll-x-contain stops a swipe that reaches the end of this
               rail from chaining into the page and triggering browser
@@ -48,8 +62,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 return (
                   <li key={href} className="shrink-0 lg:shrink">
                     <Link href={href}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+                        // min-h-11 rather than padding alone: the rail is the
+                        // primary navigation on a phone and each tab has to be a
+                        // comfortable target, not a 36px sliver.
+                        "flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition-colors",
                         active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}>
                       <Icon size={17} />
@@ -66,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               })}
               <li className="shrink-0 lg:shrink lg:pt-2">
                 <button onClick={() => logout.mutate()}
-                  className="flex w-full items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10">
+                  className="flex min-h-11 w-full items-center gap-2.5 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10">
                   <LogOut size={17} /> Log out
                 </button>
               </li>
