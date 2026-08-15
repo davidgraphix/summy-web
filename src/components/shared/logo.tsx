@@ -27,10 +27,7 @@ export function Logo({ className = "" }: { className?: string }) {
         alt="Summy Solutions & Technology"
         width={150}
         height={150}
-        // Eager + high priority: the logo is above the fold on every page, and
-        // lazy-loading it produces a visible pop-in on the first paint.
-        priority
-        className="h-8 w-auto sm:h-9"
+     
       />
     </Link>
   );
