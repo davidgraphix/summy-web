@@ -147,24 +147,25 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardContent className="p-5">
               <h2 className="mb-4 text-lg font-bold">Summary</h2>
               <dl className="space-y-2 text-sm">
-                <SummaryRow label="Subtotal" value={`₦${(order.subtotalInKobo / 100).toLocaleString()}`} />
+                <SummaryRow label="Items total" value={`₦${(order.subtotalInKobo / 100).toLocaleString()}`} />
                 {order.discountInKobo > 0 && <SummaryRow label="Discount" value={`-₦${(order.discountInKobo / 100).toLocaleString()}`} />}
                 {/*
-                  Names the arrangement, not just the charge. "Delivery — Free"
-                  and "Store pickup — ₦0.00" cost the same and mean completely
-                  different things to someone waiting for a courier.
+                  Names the arrangement, not just the charge — "store pickup" and
+                  "delivery" both cost nothing but mean different things to someone
+                  deciding whether to wait in for a courier.
+
+                  Delivery and VAT rows render a real figure if a past order
+                  carries one. Orders are historical records: an order placed
+                  under an earlier fee policy must keep showing what was actually
+                  charged, not today's zero.
                 */}
                 <SummaryRow
                   label={order.deliveryMethod === "StorePickup" ? "Delivery (store pickup)" : "Delivery"}
-                  value={
-                    order.deliveryMethod === "StorePickup"
-                      ? "₦0.00"
-                      : order.deliveryFeeInKobo === 0
-                        ? "Free"
-                        : `₦${(order.deliveryFeeInKobo / 100).toLocaleString()}`
-                  }
+                  value={order.deliveryFeeInKobo === 0 ? "FREE" : `₦${(order.deliveryFeeInKobo / 100).toLocaleString()}`}
                 />
-                <SummaryRow label="VAT" value={`₦${(order.vatInKobo / 100).toLocaleString()}`} />
+                {order.vatInKobo > 0 && (
+                  <SummaryRow label="VAT" value={`₦${(order.vatInKobo / 100).toLocaleString()}`} />
+                )}
               </dl>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <span className="font-semibold">Total</span>

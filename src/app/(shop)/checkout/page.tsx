@@ -203,16 +203,21 @@ export default function CheckoutPage() {
             <CardContent className="p-4 sm:p-5">
               <h2 className="mb-1 text-base font-bold sm:text-lg">How would you like to receive it?</h2>
               <p className="mb-4 text-sm text-muted-foreground">
-                Choose collection or delivery — the cost updates below before you pay.
+                Both options are free — choose whichever suits you.
               </p>
 
               <div className="grid gap-3 sm:grid-cols-2">
+                {/*
+                  Both options are free, so neither price is quoted or
+                  recalculated — the choice is now purely about how the customer
+                  wants to receive the order.
+                */}
                 <DeliveryOption
                   active={isPickup}
                   onSelect={() => setDeliveryMethod("StorePickup")}
                   icon={<Store size={18} />}
                   title="Store pickup"
-                  price="Free"
+                  price="FREE"
                   description="Collect from our store yourself, or send your own transport."
                 />
                 <DeliveryOption
@@ -220,13 +225,7 @@ export default function CheckoutPage() {
                   onSelect={() => setDeliveryMethod("HomeDelivery")}
                   icon={<Truck size={18} />}
                   title="Home delivery"
-                  price={
-                    quoting && !isPickup
-                      ? "Calculating…"
-                      : !isPickup && quote
-                        ? quote.deliveryFeeInKobo === 0 ? "Free" : quote.deliveryFeeFormatted
-                        : "Based on your state"
-                  }
+                  price="FREE"
                   description="Delivered to the address below."
                 />
               </div>
@@ -382,18 +381,24 @@ export default function CheckoutPage() {
                 ))}
               </ul>
 
+              {/*
+                Items total, delivery, total. No VAT row, no fee rows — the
+                customer pays the sum of the products and nothing else, and the
+                summary says exactly that.
+
+                A VAT row is still rendered if the server ever returns a non-zero
+                figure. The backend charges none today, but a summary that can
+                only display zero would hide a real charge if that policy ever
+                changed, and an invisible charge is far worse than an extra row.
+              */}
               <dl className="space-y-2 border-t border-border pt-4 text-sm">
-                <Row label="Subtotal" value={quote?.subtotalFormatted} pending={quoting} />
+                <Row label="Items total" value={quote?.subtotalFormatted} pending={quoting} />
                 <Row
                   label={isPickup ? "Delivery (store pickup)" : "Delivery"}
-                  value={
-                    quote
-                      ? quote.deliveryFeeInKobo === 0 && !isPickup ? "Free" : quote.deliveryFeeFormatted
-                      : undefined
-                  }
+                  value={quote ? (quote.deliveryFeeInKobo === 0 ? "FREE" : quote.deliveryFeeFormatted) : undefined}
                   pending={quoting}
                 />
-                <Row label="VAT (7.5%)" value={quote?.vatFormatted} pending={quoting} />
+                {!!quote && quote.vatInKobo > 0 && <Row label="VAT" value={quote.vatFormatted} pending={false} />}
               </dl>
 
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
@@ -403,11 +408,9 @@ export default function CheckoutPage() {
                 </span>
               </div>
 
-              {quote?.freeDeliveryApplied && (
-                <p className="mt-2 text-xs font-medium text-success">
-                  Free delivery applied to this order.
-                </p>
-              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                No delivery fee, VAT or extra charges — you pay the price of the items.
+              </p>
 
               {/* Desktop / tablet action. The mobile one is the fixed bar below. */}
               <Button className="mt-5 hidden h-12 w-full lg:flex" onClick={handlePlaceOrder}

@@ -101,10 +101,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             </ul>
 
             <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
-              <Row label="Subtotal" value={koboAsNaira(order.subtotalInKobo)} />
+              <Row label="Items total" value={koboAsNaira(order.subtotalInKobo)} />
               {order.discountInKobo > 0 && <Row label="Discount" value={`-${koboAsNaira(order.discountInKobo)}`} />}
-              <Row label="Delivery" value={order.deliveryFeeInKobo === 0 ? "Free" : koboAsNaira(order.deliveryFeeInKobo)} />
-              <Row label="VAT" value={koboAsNaira(order.vatInKobo)} />
+              <Row label="Delivery" value={order.deliveryFeeInKobo === 0 ? "FREE" : koboAsNaira(order.deliveryFeeInKobo)} />
+              {/* Kept for historical orders that were charged VAT; hidden when zero. */}
+              {order.vatInKobo > 0 && <Row label="VAT" value={koboAsNaira(order.vatInKobo)} />}
               <div className="flex justify-between border-t border-border pt-2">
                 <dt className="font-semibold">Total</dt>
                 <dd className="text-lg font-extrabold">{order.totalFormatted}</dd>

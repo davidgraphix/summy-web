@@ -63,7 +63,7 @@ export function CartDrawer() {
               <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
                 <span>Subtotal</span><span className="font-semibold text-foreground">{cart.cart?.subtotalFormatted}</span>
               </div>
-              <p className="mb-3 text-sm text-muted-foreground">Shipping &amp; VAT calculated at checkout</p>
+              <p className="mb-3 text-sm text-muted-foreground">Free delivery &middot; no extra charges</p>
               <Link href="/checkout" onClick={() => setOpen(false)}
                 className={buttonVariants({ className: "w-full" })}>
                 Proceed to checkout <ArrowRight size={18} />

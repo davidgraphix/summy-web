@@ -100,41 +100,28 @@ export default function CartPage() {
             <CardContent className="p-5">
               <h2 className="mb-4 text-lg font-bold">Order Summary</h2>
 
+              {/* Items and delivery only. Delivery is free, so the cart can say
+                  so outright instead of deferring it to checkout. */}
               <dl className="space-y-2 text-sm">
-                <Row label="Subtotal" value={server?.subtotalFormatted ?? "—"} />
-                {/*
-                  Delivery genuinely is not known yet: it depends on whether the
-                  customer collects or has it delivered, and to which state. Saying
-                  so is more honest than showing "Free" (which it may not be) or a
-                  fee they have not agreed to.
-                */}
-                {server && (
-                  <Row
-                    label="Delivery"
-                    value={server.deliveryPending
-                      ? "Calculated at checkout"
-                      : server.deliveryFeeInKobo === 0 ? "Free" : server.deliveryFeeFormatted}
-                  />
-                )}
-                {server && <Row label="VAT" value={server.vatFormatted} />}
+                <Row label="Items total" value={server?.subtotalFormatted ?? "—"} />
+                {server && <Row label="Delivery" value="FREE" />}
+                {!!server && server.vatInKobo > 0 && <Row label="VAT" value={server.vatFormatted} />}
               </dl>
 
               {server?.warnings.map((w) => (
                 <p key={w} className="mt-3 text-xs font-medium text-destructive">{w}</p>
               ))}
 
+              {/* The cart total is now final: nothing is added at checkout, so
+                  there is no "calculated later" caveat to make. */}
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
-                <span className="font-semibold">
-                  {server?.deliveryPending ? "Subtotal + VAT" : "Total"}
-                </span>
+                <span className="font-semibold">Total</span>
                 <span className="text-xl font-extrabold">{server?.totalFormatted ?? "—"}</span>
               </div>
 
-              {server?.deliveryPending && (
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Choose store pickup or delivery at checkout to see your final total.
-                </p>
-              )}
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Delivery is free and there are no extra charges.
+              </p>
 
               <Link href="/checkout" aria-disabled={server ? !server.isCheckoutReady : undefined}
                 className={buttonVariants({
