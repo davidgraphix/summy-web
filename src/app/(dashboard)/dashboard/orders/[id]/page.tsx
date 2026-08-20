@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Download, Package, RefreshCw, XCircle } from "lucide-react";
+import { ChevronLeft, Download, Package, Printer, RefreshCw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,7 +11,7 @@ import { OrderStatusBadge } from "@/features/orders/components/order-status-badg
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useOrder, useOrderTimeline, useCancelOrder, useReorder } from "@/features/orders/orders-hooks";
 import { usePaymentsByOrder, useInitializePayment, resolvePaymentLink } from "@/features/payments/payments-hooks";
-import { downloadFile } from "@/lib/api-client";
+import { downloadFile, fetchFileUrl } from "@/lib/api-client";
 import { ordersApi } from "@/features/orders/orders-api";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const initPayment = useInitializePayment();
   const [retrying, setRetrying] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   if (isLoading) return <LoadingState label="Loading order…" />;
   if (isError || !order) return <ErrorState onRetry={() => refetch()} />;
@@ -46,14 +47,51 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  /**
+   * An invoice exists only once the order has moved past Pending — the backend
+   * refuses to issue one for an order that was never paid for, which is correct:
+   * a document headed "Invoice" for money that never moved is a liability.
+   *
+   * Gating the button on the same rule is the actual fix for "Could not download
+   * the invoice". The backend was behaving correctly all along; the UI was
+   * offering an action that could not succeed, on precisely the orders where it
+   * could not succeed.
+   */
+  const invoiceAvailable = order.status !== "Pending" && order.status !== "Failed";
+
   const downloadInvoice = async () => {
     setDownloading(true);
     try {
       await downloadFile(ordersApi.invoicePdfPath(order.id), `invoice-${order.orderNumber}.pdf`);
-    } catch {
-      toast.error("Could not download the invoice");
+    } catch (e) {
+      // The API's own message, not a blanket string — it explains why.
+      toast.error(e instanceof Error ? e.message : "Could not download the invoice");
     } finally {
       setDownloading(false);
+    }
+  };
+
+  /**
+   * Printing opens the PDF the backend generated rather than a browser-rendered
+   * copy, so what the customer prints is byte-identical to what they download
+   * and cannot drift from the stored order.
+   */
+  const printInvoice = async () => {
+    setPrinting(true);
+    try {
+      const blobUrl = await fetchFileUrl(ordersApi.invoicePdfPath(order.id));
+      const win = window.open(blobUrl, "_blank", "noopener,noreferrer");
+
+      if (!win) {
+        toast.error("Your browser blocked the print window. Allow pop-ups, or download the invoice instead.");
+      }
+
+      // Revoked on a delay: revoking immediately can race the new tab's load.
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open the invoice");
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -186,9 +224,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <RefreshCw size={16} /> {reorder.isPending ? "Adding…" : "Reorder"}
               </Button>
 
-              <Button variant="outline" className="w-full" onClick={downloadInvoice} disabled={downloading}>
-                {downloading ? <><Spinner className="h-4 w-4" /> Downloading…</> : <><Download size={16} /> Download invoice</>}
-              </Button>
+              {invoiceAvailable ? (
+                <>
+                  <Button variant="outline" className="w-full" onClick={downloadInvoice} disabled={downloading}>
+                    {downloading
+                      ? <><Spinner className="h-4 w-4" /> Downloading…</>
+                      : <><Download size={16} /> Download invoice</>}
+                  </Button>
+                  <Button variant="outline" className="w-full" onClick={printInvoice} disabled={printing}>
+                    {printing
+                      ? <><Spinner className="h-4 w-4" /> Opening…</>
+                      : <><Printer size={16} /> Print invoice</>}
+                  </Button>
+                </>
+              ) : (
+                // Explains the absence rather than leaving a gap where a button
+                // used to be — an invoice that is simply missing reads as a bug.
+                <p className="rounded-xl bg-muted/60 p-3 text-center text-xs text-muted-foreground">
+                  Your invoice will be available here once payment is confirmed.
+                </p>
+              )}
 
               {order.isCancellable && (
                 <Button variant="destructive" className="w-full"

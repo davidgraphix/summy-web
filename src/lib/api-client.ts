@@ -228,8 +228,21 @@ export async function downloadFile(path: string, filename: string): Promise<void
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(buildUrl(path), { headers });
+
+  // A failed download still carries the API's normal error envelope, and that
+  // message is the only thing that explains *why*. "This order has no invoice
+  // until it is paid" is actionable; "Download failed (409)" is not. Parsing it
+  // here means every caller reports the real reason instead of inventing a
+  // generic one.
   if (!res.ok) {
-    throw new ApiRequestError(`Download failed (${res.status})`, res.status, null);
+    const json = (await res.json().catch(() => null)) as ApiEnvelope<unknown> | null;
+
+    throw new ApiRequestError(
+      json?.error?.message ?? `Download failed (${res.status})`,
+      res.status,
+      json?.error ?? null,
+      json?.correlationId
+    );
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -240,4 +253,36 @@ export async function downloadFile(path: string, filename: string): Promise<void
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Fetches an authenticated file and returns an object URL for it.
+ *
+ * Used for previewing/printing a PDF the backend generated. A plain
+ * `window.open` on the API path cannot work: the endpoint needs a bearer token,
+ * and a new tab carries none — so it would 401. Fetching first and handing the
+ * browser a blob URL keeps the request authenticated while still letting the
+ * native PDF viewer (and its print button) do the work.
+ *
+ * The caller owns the returned URL and must revoke it.
+ */
+export async function fetchFileUrl(path: string): Promise<string> {
+  const token = useAuthStore.getState().accessToken;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(buildUrl(path), { headers });
+
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as ApiEnvelope<unknown> | null;
+
+    throw new ApiRequestError(
+      json?.error?.message ?? `Could not open the file (${res.status})`,
+      res.status,
+      json?.error ?? null,
+      json?.correlationId
+    );
+  }
+
+  return URL.createObjectURL(await res.blob());
 }
