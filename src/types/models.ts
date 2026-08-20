@@ -339,6 +339,8 @@ export interface Order {
   userId: string;
   customerName: string | null;
   customerEmail: string | null;
+  /** The account holder's phone, which may differ from the shipping recipient's. */
+  customerPhone: string | null;
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
   paymentMethod: OrderPaymentMethod;

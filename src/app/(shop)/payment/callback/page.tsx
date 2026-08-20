@@ -3,11 +3,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useVerifyPayment } from "@/features/payments/payments-hooks";
+import { ApiRequestError } from "@/lib/api-client";
+import { useVerifyPayment, PAYMENT_UNDER_REVIEW } from "@/features/payments/payments-hooks";
 import { useOrder } from "@/features/orders/orders-hooks";
 import { useStorefrontSettings } from "@/features/products/settings-hooks";
 
@@ -34,7 +36,7 @@ function CallbackInner() {
   // Flutterwave sends a status hint; the server verification is authoritative.
   const statusHint = params.get("status");
 
-  const { data: payment, isLoading, isError, error } = useVerifyPayment(reference);
+  const { data: payment, isLoading, isError, error, refetch, isFetching } = useVerifyPayment(reference);
 
   // Fetched for the order number and fulfilment method shown on the receipt.
   // Non-blocking: the payment result is what matters, and this must never delay
@@ -73,17 +75,39 @@ function CallbackInner() {
   }
 
   if (isError) {
+    const code = error instanceof ApiRequestError ? error.error?.code : undefined;
+
+    // A flagged amount means the money very likely arrived but did not match
+    // what was owed. Telling that customer their payment "failed" invites them
+    // to pay a second time for an order that may already be settled, which is
+    // the worst outcome available. Warm tone, explicit "do not pay again".
+    if (code === PAYMENT_UNDER_REVIEW) {
+      return (
+        <Result
+          icon={<ShieldAlert size={30} />}
+          tone="warning"
+          title="Payment received — under review"
+          description="We have your payment but it did not match the order total exactly, so it has been passed to our team to confirm manually. This usually takes a few hours."
+          orderId={orderId}
+          supportEmail={supportEmail}
+          doNotPayAgain
+        />
+      );
+    }
+
+    // Everything else at this point is "we could not get an answer", not "it
+    // failed" — the retries above have already covered the slow cases.
     return (
       <Result
-        icon={<XCircle size={30} />}
-        tone="error"
-        title="We couldn't confirm your payment"
-        description={
-          (error as Error)?.message ??
-          "The payment could not be verified. If money left your account, it will be reconciled — check your order for the latest status."
-        }
+        icon={<Clock size={30} />}
+        tone="warning"
+        title="We are still confirming your payment"
+        description="Your payment has not been confirmed yet. If your account was debited the order will update automatically once the bank confirms it — this can take a few minutes for a transfer."
         orderId={orderId}
         supportEmail={supportEmail}
+        onRecheck={() => void refetch()}
+        rechecking={isFetching}
+        doNotPayAgain
       />
     );
   }
@@ -162,24 +186,40 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 
 function Result({
   icon, tone, title, description, orderId, meta, nextSteps, supportEmail, retry,
+  onRecheck, rechecking, doNotPayAgain,
 }: {
   icon: React.ReactNode;
-  tone: "success" | "error";
+  /**
+   * `warning` is deliberately distinct from `error`. A payment awaiting
+   * confirmation, or one held for review, is not a failure, and colouring it red
+   * next to the words "your account was debited" is how a customer talks
+   * themselves into paying twice.
+   */
+  tone: "success" | "error" | "warning";
   title: string;
   description: string;
   orderId: string | null;
   meta?: React.ReactNode;
   nextSteps?: string;
   supportEmail?: string | null;
-  /** Shown on failure: the cart is intact, so retrying is one tap. */
+  /** Shown on genuine failure only: the cart is intact, so retrying is one tap. */
   retry?: boolean;
+  /** Re-runs server-side verification on demand, for a transfer still clearing. */
+  onRecheck?: () => void;
+  rechecking?: boolean;
+  /** The single most important line on the screen when money may have moved. */
+  doNotPayAgain?: boolean;
 }) {
   return (
     <Shell>
       <Card>
         <CardContent className="p-6 text-center sm:p-8">
           <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl ${
-            tone === "success" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+            tone === "success"
+              ? "bg-success/10 text-success"
+              : tone === "warning"
+                ? "bg-accent/10 text-accent"
+                : "bg-destructive/10 text-destructive"
           }`}>
             {icon}
           </div>
@@ -187,6 +227,15 @@ function Result({
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>
 
           {meta && <div className="mt-5 divide-y divide-border border-y border-border text-left">{meta}</div>}
+
+          {doNotPayAgain && (
+            // Placed above the buttons on purpose: it has to be read before any
+            // action is taken, not after.
+            <p className="mt-4 rounded-xl border border-accent/30 bg-accent/5 p-3 text-left text-sm font-medium">
+              Please do not pay again. If your account was debited, that payment is recorded
+              against this order and nothing further will be charged.
+            </p>
+          )}
 
           {nextSteps && (
             <p className="mt-4 rounded-xl bg-muted/60 p-3 text-left text-sm text-muted-foreground">
@@ -204,6 +253,14 @@ function Result({
               <Link href="/dashboard/orders" className={buttonVariants({ className: "h-12 w-full" })}>
                 View your orders
               </Link>
+            )}
+
+            {onRecheck && (
+              <Button variant="outline" className="h-12 w-full" onClick={onRecheck} disabled={rechecking}>
+                {rechecking
+                  ? <><Spinner className="h-4 w-4" /> Checking…</>
+                  : <><RefreshCw size={16} /> Check payment status</>}
+              </Button>
             )}
 
             {retry && (

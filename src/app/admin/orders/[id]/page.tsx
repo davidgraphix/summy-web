@@ -230,13 +230,61 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           </CardContent></Card>
 
           <Card><CardContent className="p-5">
-            <h2 className="mb-2 font-bold tracking-tight">Customer</h2>
-            <p className="text-sm font-medium">{order.customerName ?? "—"}</p>
-            <p className="truncate text-sm text-muted-foreground">{order.customerEmail}</p>
-            <Link href={`/admin/customers/${order.userId}`}
-              className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3 w-full" })}>
-              View customer
-            </Link>
+            <h2 className="mb-3 font-bold tracking-tight">Customer</h2>
+
+            {/*
+              The account that placed the order — deliberately not the shipping
+              recipient, who may be someone else entirely. Staff need both, and
+              the two are labelled separately below so a support call never
+              chases the wrong person.
+            */}
+            {order.customerName || order.customerEmail ? (
+              <dl className="space-y-2 text-sm">
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Name</dt>
+                  <dd className="font-medium">{order.customerName ?? "—"}</dd>
+                </div>
+                {order.customerEmail && (
+                  <div className="min-w-0">
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Email</dt>
+                    <dd className="truncate">
+                      <a href={`mailto:${order.customerEmail}`} className="text-primary hover:underline">
+                        {order.customerEmail}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+                {order.customerPhone && (
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Phone</dt>
+                    <dd>
+                      <a href={`tel:${order.customerPhone}`} className="text-primary hover:underline">
+                        {order.customerPhone}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              // No linked account. Says so plainly rather than rendering a dash
+              // that reads like a loading failure.
+              <p className="text-sm text-muted-foreground">Guest checkout — no customer account linked.</p>
+            )}
+
+            {/* Repeated here so "who bought it" and "who receives it" can be
+                compared without scrolling between two cards. */}
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Shipping recipient</p>
+              <p className="text-sm font-medium">{order.shippingAddress.recipientName}</p>
+              <p className="text-sm text-muted-foreground">{order.shippingAddress.phoneNumber}</p>
+            </div>
+
+            {(order.customerName || order.customerEmail) && (
+              <Link href={`/admin/customers/${order.userId}`}
+                className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3 w-full" })}>
+                View customer
+              </Link>
+            )}
           </CardContent></Card>
         </aside>
       </div>
