@@ -149,7 +149,17 @@ async function execute<T>(path: string, options: RequestOptions, isRetry = false
   const { method = "GET", body, auth = true, params, signal, formData } = options;
 
   const headers: Record<string, string> = { ...options.headers };
-  if (!formData) headers["Content-Type"] = "application/json";
+
+  // Only when there is actually a body to describe.
+  //
+  // This was set on every request including GETs, where it describes nothing —
+  // and `Content-Type: application/json` is not a CORS-safelisted value, so it
+  // forced a preflight OPTIONS in front of every anonymous read. The storefront's
+  // hot path (products, brands, categories, settings) is exactly those reads, so
+  // the browsing experience was paying two cross-origin round trips per request
+  // instead of one. Authenticated calls still preflight because of the
+  // Authorization header; those are now cached by the API's preflight max-age.
+  if (!formData && body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
     const { accessToken, refreshToken } = useAuthStore.getState();
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
