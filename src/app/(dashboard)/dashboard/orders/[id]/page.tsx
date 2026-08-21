@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState, LoadingState } from "@/components/shared/states";
 import { OrderStatusBadge } from "@/features/orders/components/order-status-badge";
+import { PaymentStatusBadge } from "@/features/orders/components/payment-status-badge";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useOrder, useOrderTimeline, useCancelOrder, useReorder } from "@/features/orders/orders-hooks";
 import { usePaymentsByOrder, useInitializePayment, resolvePaymentLink } from "@/features/payments/payments-hooks";
@@ -171,7 +172,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold uppercase text-muted-foreground">{payment.data.status}</span>
+                    {/* A badge, not grey uppercase text: "Successful" and
+                        "Expired" used to look identical here. */}
+                    <PaymentStatusBadge status={payment.data.status} />
                     <span className="font-bold">{payment.data.amountFormatted}</span>
                   </div>
                 </div>
