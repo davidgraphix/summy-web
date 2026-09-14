@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND_NAME, SITE_HOST } from "@/lib/brand";
 import { useEffect } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -249,10 +250,16 @@ export function ProductForm({
             <div className="rounded-xl border border-border bg-muted/40 p-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Search preview</p>
               <p className="truncate text-sm font-medium text-primary">
-                {form.watch("metaTitle") || form.watch("name") || "Product name"} · Summy
+                {form.watch("metaTitle") || form.watch("name") || "Product name"} · {BRAND_NAME}
               </p>
+              {/*
+                Host comes from NEXT_PUBLIC_SITE_URL rather than a literal. The
+                old domain was hardcoded here, so the preview would keep
+                advertising a hostname the business no longer owns. Falls back to
+                a neutral placeholder until the new domain is configured.
+              */}
               <p className="truncate text-xs text-success">
-                summysolutions.com/products/{form.watch("slug") || "product-slug"}
+                {SITE_HOST}/products/{form.watch("slug") || "product-slug"}
               </p>
               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                 {form.watch("metaDescription") || form.watch("shortDescription") || "Add a description to control how this looks in search results."}

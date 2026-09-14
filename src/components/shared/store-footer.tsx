@@ -1,10 +1,11 @@
 "use client";
 
+import { BRAND_NAME } from "@/lib/brand";
 import { useStorefrontSettings } from "@/features/products/settings-hooks";
 
 export function StoreFooter() {
   const { data: settings } = useStorefrontSettings();
-  const companyName = settings?.companyName ?? "Summy";
+  const companyName = settings?.companyName ?? BRAND_NAME;
   const location = [settings?.city, settings?.state, settings?.country].filter(Boolean).join(", ");
 
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND_NAME } from "@/lib/brand";
 import { useState } from "react";
 import { Check, Copy, Gift, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ export default function ReferralsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight">Referrals</h1>
-        <p className="text-sm text-muted-foreground">Invite friends to Summy and earn rewards.</p>
+        <p className="text-sm text-muted-foreground">Invite friends to {BRAND_NAME} and earn rewards.</p>
       </div>
 
       <Card>

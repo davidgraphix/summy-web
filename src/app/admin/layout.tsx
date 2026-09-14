@@ -1,9 +1,10 @@
+import { BRAND_NAME } from "@/lib/brand";
 import type { Metadata } from "next";
 import { AdminGuard } from "@/features/admin/admin-guard";
 import { AdminShell } from "@/features/admin/components/admin-shell";
 
 export const metadata: Metadata = {
-  title: { default: "Admin", template: "%s · Summy Admin" },
+  title: { default: "Admin", template: `%s · ${BRAND_NAME} Admin` },
   robots: { index: false, follow: false },
 };
 

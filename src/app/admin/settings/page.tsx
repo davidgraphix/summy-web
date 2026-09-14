@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND_NAME, LEGAL_NAME } from "@/lib/brand";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { AlertTriangle, Save } from "lucide-react";
@@ -50,7 +51,7 @@ export default function AdminSettingsPage() {
             defaults={data} pending={m.company.isPending}
             onSave={(v) => m.company.mutate({ ...v, companyName: v.companyName || data.companyName })}
             fields={[
-              { name: "companyName", label: "Company name", placeholder: "Summy Solution & Technology Ventures" },
+              { name: "companyName", label: "Company name", placeholder: LEGAL_NAME },
               { name: "legalName", label: "Legal name" },
               { name: "registrationNumber", label: "Registration number", placeholder: "BN-3217879" },
               { name: "taxIdentificationNumber", label: "Tax ID (TIN)" },
@@ -64,8 +65,8 @@ export default function AdminSettingsPage() {
             defaults={data} pending={m.contact.isPending}
             onSave={(v) => m.contact.mutate(v)}
             fields={[
-              { name: "supportEmail", label: "Support email", placeholder: "support@summy.com" },
-              { name: "salesEmail", label: "Sales email", placeholder: "sales@summy.com" },
+              { name: "supportEmail", label: "Support email", placeholder: "support@your-domain.com" },
+              { name: "salesEmail", label: "Sales email", placeholder: "sales@your-domain.com" },
               { name: "primaryPhone", label: "Primary phone", placeholder: "0803 000 0000" },
               { name: "secondaryPhone", label: "Secondary phone" },
               { name: "whatsAppNumber", label: "WhatsApp", placeholder: "+234 803 000 0000" },
@@ -100,7 +101,7 @@ export default function AdminSettingsPage() {
             onSave={(v) => m.seo.mutate(v)}
             hint="These defaults are used for storefront pages that don't set their own metadata."
             fields={[
-              { name: "defaultMetaTitle", label: "Default meta title", placeholder: "Summy — Electronics & appliances" },
+              { name: "defaultMetaTitle", label: "Default meta title", placeholder: `${BRAND_NAME} — Electronics & appliances` },
               { name: "defaultMetaDescription", label: "Default meta description", textarea: true },
               { name: "defaultMetaKeywords", label: "Keywords", placeholder: "tv, fridge, air conditioner" },
               { name: "defaultOgImageUrl", label: "Social share image URL", placeholder: "https://…" },

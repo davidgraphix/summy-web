@@ -1,3 +1,4 @@
+import { BRAND_NAME } from "@/lib/brand";
 import type { Metadata } from "next";
 import { productsApi } from "@/features/products/products-api";
 import { ProductDetail } from "./product-detail";
@@ -11,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // SEO fields set in the admin dashboard take precedence over the defaults.
     const title = p.seo.metaTitle?.trim() || p.name;
     const description =
-      p.seo.metaDescription?.trim() || p.shortDescription?.slice(0, 160) || `Buy ${p.name} on Summy`;
+      p.seo.metaDescription?.trim() || p.shortDescription?.slice(0, 160) || `Buy ${p.name} on ${BRAND_NAME}`;
     const image = p.images.find((i) => i.isFeatured)?.secureUrl ?? p.images[0]?.secureUrl;
     return {
       title,

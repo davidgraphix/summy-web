@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND_NAME } from "@/lib/brand";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -82,7 +83,7 @@ function LoginForm() {
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          New to Summy?{" "}
+          New to {BRAND_NAME}?{" "}
           <Link href={`/register?redirect=${encodeURIComponent(explicitRedirect || "/dashboard")}`} className="font-semibold text-primary hover:underline">
             Create an account
           </Link>
