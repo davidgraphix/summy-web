@@ -3,7 +3,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * The Summy wordmark, sized by CSS rather than by its intrinsic dimensions.
+ * The Mega Dealers wordmark, sized by CSS rather than by its intrinsic dimensions.
  *
  * <p>
  * The <code>width</code>/<code>height</code> props are the image's real aspect
@@ -19,12 +19,12 @@ export function Logo({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/"
-      aria-label="Summy home"
+      aria-label="Mega Dealers home"
       className={cn("flex shrink-0 items-center gap-2", className)}
     >
       <Image
         src="/mega-dealers-logo.PNG"
-        alt="Summy Solutions & Technology"
+        alt="Mega Dealers"
         width={150}
         height={150}
      
