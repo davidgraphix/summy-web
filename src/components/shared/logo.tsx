@@ -23,7 +23,7 @@ export function Logo({ className = "" }: { className?: string }) {
       className={cn("flex shrink-0 items-center gap-2", className)}
     >
       <Image
-        src="/summy-logo.png"
+        src="/mega-dealers-logo.PNG"
         alt="Summy Solutions & Technology"
         width={150}
         height={150}
