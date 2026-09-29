@@ -2,28 +2,74 @@ import { LEGAL_NAME } from "@/lib/brand";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex h-16 items-center justify-between px-4 sm:px-8">
-        <Logo />
-        <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-          Back to shop
-        </Link>
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* =========================================================
+          AUTH HEADER
+      ========================================================= */}
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/95 backdrop-blur-md">
+        <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* Compact Auth Logo */}
+          <Logo
+            className="
+              [&_img]:h-[54px]
+              [&_img]:w-[155px]
+              sm:[&_img]:h-[58px]
+              sm:[&_img]:w-[170px]
+            "
+          />
+
+          {/* Back to Shop */}
+          <Link
+            href="/"
+            className="
+              inline-flex
+              items-center
+              rounded-lg
+              border border-border/70
+              bg-background
+              px-3.5
+              py-2
+              text-sm
+              font-medium
+              text-muted-foreground
+              shadow-sm
+              transition-all
+              duration-200
+              hover:border-primary/30
+              hover:bg-muted
+              hover:text-foreground
+              hover:shadow-md
+              active:scale-[0.98]
+              sm:px-4
+            "
+          >
+            Back to shop
+          </Link>
+        </div>
       </header>
-      <main className="flex flex-1 items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md">{children}</div>
+
+      {/* =========================================================
+          AUTH CONTENT
+      ========================================================= */}
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-12">
+        <div className="w-full max-w-md">
+          {children}
+        </div>
       </main>
-      {/*
-        The old line carried "BN-3217879", the previous entity's Business Name
-        registration. Mega Dealers Global Limited is a limited company, so that
-        number does not carry over — it would have an RC number instead, which
-        has not been supplied. Showing the old BN against the new name would be a
-        false registration claim, so only the legal name is displayed until the
-        RC number is provided.
-      */}
-      <footer className="py-6 text-center text-xs text-muted-foreground">
-        {LEGAL_NAME}
+
+      {/* =========================================================
+          FOOTER
+      ========================================================= */}
+      <footer className="border-t border-border/60 px-4 py-5 text-center">
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} {LEGAL_NAME}
+        </p>
       </footer>
     </div>
   );
