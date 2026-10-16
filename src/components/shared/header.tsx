@@ -1,9 +1,16 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, ShoppingCart, User, ChevronDown } from "lucide-react";
+import {
+  Bell,
+  LogOut,
+  ShoppingCart,
+  User,
+  ChevronDown,
+} from "lucide-react";
 
 import { Logo } from "@/components/shared/logo";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -36,20 +43,29 @@ export function Header() {
 
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Update the shadow without resizing the header.
+  // Track scrolling without updating React state on every scroll event.
   useEffect(() => {
     let frameId = 0;
+    let previousState = false;
 
-    const handleScroll = () => {
-      if (frameId) return;
+    const updateScrollState = () => {
+      const nextState = window.scrollY > 40;
 
-      frameId = window.requestAnimationFrame(() => {
-        setIsScrolled(window.scrollY > 40);
-        frameId = 0;
-      });
+      if (nextState !== previousState) {
+        previousState = nextState;
+        setIsScrolled(nextState);
+      }
+
+      frameId = 0;
     };
 
-    handleScroll();
+    const handleScroll = () => {
+      if (frameId !== 0) return;
+
+      frameId = window.requestAnimationFrame(updateScrollState);
+    };
+
+    updateScrollState();
 
     window.addEventListener("scroll", handleScroll, {
       passive: true,
@@ -58,16 +74,19 @@ export function Header() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
 
-      if (frameId) {
+      if (frameId !== 0) {
         window.cancelAnimationFrame(frameId);
       }
     };
   }, []);
 
-  // Close the account menu on outside clicks or Escape.
+  // Close the account dropdown when clicking outside or pressing Escape.
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
         setMenu(false);
       }
     };
@@ -100,15 +119,29 @@ export function Header() {
         backgroundColor: "hsl(var(--background))",
       }}
     >
-      <div className="mx-auto w-full max-w-7xl px-3 sm:px-5 lg:px-8">
-        <div className="flex min-h-[76px] items-center gap-2 sm:min-h-[84px] sm:gap-4">
-          {/* Logo */}
-          <div className="flex min-w-0 shrink-0 items-center">
+      <div
+        className={`mx-auto w-full max-w-7xl transition-[padding] duration-200 ease-out motion-reduce:transition-none ${
+          isScrolled
+            ? "px-2 sm:px-4 lg:px-6"
+            : "px-3 sm:px-5 lg:px-8"
+        }`}
+      >
+        <div className="flex min-h-[76px] items-center gap-2 sm:min-h-[84px] sm:gap-3 lg:gap-4">
+          {/* Logo: compact without changing the header height */}
+          <div
+            className={`flex min-w-0 shrink-0 items-center transition-transform duration-200 ease-out motion-reduce:transition-none ${
+              isScrolled ? "scale-[0.92]" : "scale-100"
+            }`}
+          >
             <Logo className="shrink-0" />
           </div>
 
           {/* Search */}
-          <div className="min-w-0 flex-1">
+          <div
+            className={`min-w-0 flex-1 transition-[margin] duration-200 ease-out motion-reduce:transition-none ${
+              isScrolled ? "mx-0" : "mx-0"
+            }`}
+          >
             <SearchBar className="w-full" />
           </div>
 
@@ -136,7 +169,9 @@ export function Header() {
             <button
               type="button"
               onClick={() =>
-                isAuth ? setMenu((value) => !value) : router.push("/login")
+                isAuth
+                  ? setMenu((value) => !value)
+                  : router.push("/login")
               }
               aria-label="Account"
               aria-expanded={isAuth ? menu : undefined}
@@ -152,7 +187,6 @@ export function Header() {
                 aria-label="Account menu"
                 className="absolute right-0 top-full z-50 mt-3 w-56 overflow-hidden rounded-2xl border border-border/70 bg-background p-1.5 shadow-xl shadow-black/10"
               >
-                {/* Account heading */}
                 <div className="border-b border-border/60 px-3 py-3">
                   <div className="flex items-center gap-3">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
@@ -168,7 +202,6 @@ export function Header() {
                   </div>
                 </div>
 
-                {/* Account links */}
                 <nav aria-label="Account navigation" className="py-1">
                   {ACCOUNT_LINKS.map(({ label, href }) => (
                     <Link
@@ -188,7 +221,6 @@ export function Header() {
                   ))}
                 </nav>
 
-                {/* Logout */}
                 <div className="border-t border-border/60 pt-1">
                   <button
                     type="button"
@@ -219,7 +251,11 @@ export function Header() {
             }
             className={actionButtonClass}
           >
-            <ShoppingCart size={19} strokeWidth={1.8} aria-hidden="true" />
+            <ShoppingCart
+              size={19}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
 
             {cart.count > 0 && (
               <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
