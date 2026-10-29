@@ -1,6 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
 
 :root {
   --background: 240 33% 97%;      /* #F4F4FB lavender canvas */

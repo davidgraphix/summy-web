@@ -1,16 +1,9 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Bell,
-  LogOut,
-  ShoppingCart,
-  User,
-  ChevronDown,
-} from "lucide-react";
+import { Bell, LogOut, ShoppingCart, User, ChevronRight } from "lucide-react";
 
 import { Logo } from "@/components/shared/logo";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -31,6 +24,9 @@ const ACCOUNT_LINKS = [
 const actionButtonClass =
   "relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border/70 bg-background text-foreground transition-colors duration-150 hover:border-primary/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:h-11 sm:w-11";
 
+const badgeClass =
+  "absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background";
+
 export function Header() {
   const router = useRouter();
   const cart = useCart();
@@ -40,69 +36,50 @@ export function Header() {
 
   const [menu, setMenu] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Track scrolling without updating React state on every scroll event.
+  // Only touches React state when the threshold is crossed, not on every scroll event.
   useEffect(() => {
     let frameId = 0;
-    let previousState = false;
+    let previous = false;
 
-    const updateScrollState = () => {
-      const nextState = window.scrollY > 40;
-
-      if (nextState !== previousState) {
-        previousState = nextState;
-        setIsScrolled(nextState);
+    const update = () => {
+      const next = window.scrollY > 8;
+      if (next !== previous) {
+        previous = next;
+        setIsScrolled(next);
       }
-
       frameId = 0;
     };
 
-    const handleScroll = () => {
-      if (frameId !== 0) return;
-
-      frameId = window.requestAnimationFrame(updateScrollState);
+    const onScroll = () => {
+      if (frameId === 0) frameId = window.requestAnimationFrame(update);
     };
 
-    updateScrollState();
-
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
-
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-
-      if (frameId !== 0) {
-        window.cancelAnimationFrame(frameId);
-      }
+      window.removeEventListener("scroll", onScroll);
+      if (frameId !== 0) window.cancelAnimationFrame(frameId);
     };
   }, []);
 
-  // Close the account dropdown when clicking outside or pressing Escape.
+  // Close the account dropdown on outside click or Escape.
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenu(false);
       }
     };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenu(false);
-      }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(false);
     };
 
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
@@ -110,159 +87,135 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-40 isolate w-full border-b border-border/70 ${
-        isScrolled
-          ? "shadow-md shadow-black/[0.06]"
-          : "shadow-sm shadow-black/[0.02]"
+      className={`sticky top-0 z-40 w-full border-b border-border/70 bg-background transition-shadow duration-200 ${
+        isScrolled ? "shadow-md shadow-black/[0.06]" : "shadow-none"
       }`}
-      style={{
-        backgroundColor: "hsl(var(--background))",
-      }}
     >
-      <div
-        className={`mx-auto w-full max-w-7xl transition-[padding] duration-200 ease-out motion-reduce:transition-none ${
-          isScrolled
-            ? "px-2 sm:px-4 lg:px-6"
-            : "px-3 sm:px-5 lg:px-8"
-        }`}
-      >
-        <div className="flex min-h-[76px] items-center gap-2 sm:min-h-[84px] sm:gap-3 lg:gap-4">
-          {/* Logo: compact without changing the header height */}
-          <div
-            className={`flex min-w-0 shrink-0 items-center transition-transform duration-200 ease-out motion-reduce:transition-none ${
-              isScrolled ? "scale-[0.92]" : "scale-100"
-            }`}
-          >
-            <Logo className="shrink-0" />
+      <div className="mx-auto w-full max-w-7xl px-3 sm:px-5 lg:px-8">
+        {/*
+          Mobile: row 1 = logo + actions, row 2 = full-width search.
+          sm and up: everything on a single row.
+        */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 py-2.5 sm:min-h-[84px] sm:flex-nowrap sm:gap-3 sm:py-0 lg:gap-4">
+          {/* Logo */}
+          <div className="order-1 mr-auto flex min-w-0 shrink-0 items-center sm:mr-0">
+            <Logo className="h-9 w-auto sm:h-11" />
           </div>
 
-          {/* Search */}
-          <div
-            className={`min-w-0 flex-1 transition-[margin] duration-200 ease-out motion-reduce:transition-none ${
-              isScrolled ? "mx-0" : "mx-0"
-            }`}
-          >
-            <SearchBar className="w-full" />
-          </div>
-
-          {/* Notifications */}
-          <Link
-            href="/dashboard/notifications"
-            aria-label={
-              unreadCount > 0
-                ? `Notifications, ${unreadCount} unread`
-                : "Notifications"
-            }
-            className={actionButtonClass}
-          >
-            <Bell size={19} strokeWidth={1.8} aria-hidden="true" />
-
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </Link>
-
-          {/* Account */}
-          <div className="relative shrink-0" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() =>
-                isAuth
-                  ? setMenu((value) => !value)
-                  : router.push("/login")
+          {/* Actions */}
+          <div className="order-2 flex shrink-0 items-center gap-2 sm:order-3 sm:gap-3">
+            <Link
+              href="/dashboard/notifications"
+              aria-label={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : "Notifications"
               }
-              aria-label="Account"
-              aria-expanded={isAuth ? menu : undefined}
-              aria-haspopup={isAuth ? "menu" : undefined}
               className={actionButtonClass}
             >
-              <User size={19} strokeWidth={1.8} aria-hidden="true" />
-            </button>
+              <Bell size={19} strokeWidth={1.8} aria-hidden="true" />
+              {unreadCount > 0 && (
+                <span className={badgeClass}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
 
-            {isAuth && menu && (
-              <div
-                role="menu"
-                aria-label="Account menu"
-                className="absolute right-0 top-full z-50 mt-3 w-56 overflow-hidden rounded-2xl border border-border/70 bg-background p-1.5 shadow-xl shadow-black/10"
+            {/* Account */}
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() =>
+                  isAuth ? setMenu((v) => !v) : router.push("/login")
+                }
+                aria-label="Account"
+                aria-expanded={isAuth ? menu : undefined}
+                aria-haspopup={isAuth ? "menu" : undefined}
+                className={actionButtonClass}
               >
-                <div className="border-b border-border/60 px-3 py-3">
-                  <div className="flex items-center gap-3">
+                <User size={19} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+
+              {isAuth && menu && (
+                <div
+                  role="menu"
+                  aria-label="Account menu"
+                  className="absolute right-0 top-full z-50 mt-3 w-56 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-border/70 bg-background p-1.5 shadow-xl shadow-black/10"
+                >
+                  <div className="flex items-center gap-3 border-b border-border/60 px-3 py-3">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                       <User size={18} aria-hidden="true" />
                     </div>
-
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold">My Account</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
+                      <p className="truncate text-sm font-semibold">My Account</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         Manage your account
                       </p>
                     </div>
                   </div>
-                </div>
 
-                <nav aria-label="Account navigation" className="py-1">
-                  {ACCOUNT_LINKS.map(({ label, href }) => (
-                    <Link
-                      key={href}
-                      href={href}
+                  <nav aria-label="Account navigation" className="py-1">
+                    {ACCOUNT_LINKS.map(({ label, href }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        role="menuitem"
+                        onClick={() => setMenu(false)}
+                        className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-150 hover:bg-muted focus-visible:bg-muted"
+                      >
+                        <span>{label}</span>
+                        <ChevronRight
+                          size={14}
+                          className="text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    ))}
+                  </nav>
+
+                  <div className="border-t border-border/60 pt-1">
+                    <button
+                      type="button"
                       role="menuitem"
-                      onClick={() => setMenu(false)}
-                      className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground outline-none transition-colors duration-150 hover:bg-muted focus-visible:bg-muted"
+                      disabled={logout.isPending}
+                      onClick={() => {
+                        setMenu(false);
+                        logout.mutate();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-destructive outline-none transition-colors duration-150 hover:bg-destructive/10 focus-visible:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <span>{label}</span>
-                      <ChevronDown
-                        size={14}
-                        className="-rotate-90 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                    </Link>
-                  ))}
-                </nav>
-
-                <div className="border-t border-border/60 pt-1">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={logout.isPending}
-                    onClick={() => {
-                      setMenu(false);
-                      logout.mutate();
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-destructive outline-none transition-colors duration-150 hover:bg-destructive/10 focus-visible:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <LogOut size={15} aria-hidden="true" />
-                    {logout.isPending ? "Logging out..." : "Log out"}
-                  </button>
+                      <LogOut size={15} aria-hidden="true" />
+                      {logout.isPending ? "Logging out..." : "Log out"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Cart */}
+            <button
+              type="button"
+              onClick={openCart}
+              aria-label={
+                cart.count > 0
+                  ? `Shopping cart, ${cart.count} items`
+                  : "Shopping cart"
+              }
+              className={actionButtonClass}
+            >
+              <ShoppingCart size={19} strokeWidth={1.8} aria-hidden="true" />
+              {cart.count > 0 && (
+                <span className={badgeClass}>
+                  {cart.count > 99 ? "99+" : cart.count}
+                </span>
+              )}
+            </button>
           </div>
 
-          {/* Shopping cart */}
-          <button
-            type="button"
-            onClick={openCart}
-            aria-label={
-              cart.count > 0
-                ? `Shopping cart, ${cart.count} items`
-                : "Shopping cart"
-            }
-            className={actionButtonClass}
-          >
-            <ShoppingCart
-              size={19}
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
-
-            {cart.count > 0 && (
-              <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
-                {cart.count > 99 ? "99+" : cart.count}
-              </span>
-            )}
-          </button>
+          {/* Search: full-width second row on mobile, flexible middle on sm+ */}
+          <div className="order-3 w-full min-w-0 basis-full sm:order-2 sm:basis-0 sm:flex-1">
+            <SearchBar className="w-full min-w-0" />
+          </div>
         </div>
       </div>
     </header>

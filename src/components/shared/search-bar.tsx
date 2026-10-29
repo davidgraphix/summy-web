@@ -1,42 +1,35 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
 
 /**
- * The site's single search control.
- *
- * <p>
- * There used to be two — one in the header, one on the storefront — which was
- * not just duplication: the header's pushed <code>/?search=…</code> while the
- * storefront read that parameter only into <code>useState</code>'s initial
- * value, so every header search after the first silently did nothing. The URL
- * is now the single source of truth, which fixes that class of bug outright and
- * makes a search result shareable, bookmarkable and survivable across a reload.
- * </p>
+ * The site's single search control. The URL (?search=…) is the source of
+ * truth, so results are shareable, bookmarkable and survive a reload.
  */
 interface SearchBarProps {
   className?: string;
   autoFocus?: boolean;
   placeholder?: string;
-  /** Called once a search has been committed — used to close the mobile sheet. */
+  /** Called once a search has been committed (e.g. to close a mobile sheet). */
   onSubmitted?: () => void;
 }
 
 /**
- * Suspense boundary, owned here rather than left to every caller.
- *
- * <p>
- * <code>useSearchParams</code> opts a subtree out of prerendering unless it sits
- * under Suspense. This bar lives in the site header, so without the boundary in
- * this file every statically generated page that renders the header fails the
- * production build — which is exactly what happened. Keeping it with the
- * component means a new consumer cannot forget it.
- * </p>
+ * useSearchParams needs a Suspense boundary or statically generated pages that
+ * render the header fail the production build. It lives here so no consumer
+ * can forget it.
  */
 export function SearchBar(props: SearchBarProps) {
   return (
@@ -46,7 +39,7 @@ export function SearchBar(props: SearchBarProps) {
   );
 }
 
-/** Matches the real field's dimensions exactly, so nothing shifts on hydration. */
+/** Same dimensions as the real field, so nothing shifts on hydration. */
 function SearchBarSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn("relative min-w-0", className)} aria-hidden>
@@ -62,84 +55,72 @@ function SearchBarInner({
   onSubmitted,
 }: SearchBarProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useSearchParams();
+  const [isNavigating, startTransition] = useTransition();
 
-  const urlTerm = params.get("search") ?? "";
+  const urlTerm = params.get("search")?.trim() ?? "";
   const [value, setValue] = useState(urlTerm);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 350ms: long enough that ordinary typing produces one request rather than
-  // one per keystroke, short enough that the results feel like they are keeping
-  // up. Below ~250ms a fast typist still fires several requests; above ~500ms
-  // the pause becomes noticeable.
+  // 350ms: one request per pause in typing, not one per keystroke.
   const debounced = useDebounce(value, 350);
 
-  /**
-   * Tracks whether the field has diverged from the URL. Without it, the effect
-   * below would push a navigation on mount for a URL that already carries the
-   * term, and again on every back/forward.
-   */
-  const dirty = useRef(false);
+  /** The last term this component put in the URL. */
+  const lastWritten = useRef(urlTerm);
 
-  // Keep the field in step when the URL changes underneath it — a back button,
-  // a "clear filters" action, or a link into a pre-filled search.
+  const writeTerm = useCallback(
+    (raw: string) => {
+      const term = raw.trim();
+      if (term === lastWritten.current) return;
+      lastWritten.current = term;
+
+      // Read from the live URL so other params are never lost to a stale closure.
+      const next = new URLSearchParams(window.location.search);
+      if (term) next.set("search", term);
+      else next.delete("search");
+
+      const query = next.toString();
+
+      // Results render on the catalogue, so searching from any page lands on "/".
+      // replace, not push: refining a search must not bury the back button.
+      startTransition(() => {
+        router.replace(query ? `/?${query}` : "/", { scroll: false });
+      });
+    },
+    [router]
+  );
+
+  // The URL changed from outside (back/forward, "Clear all filters", a link
+  // into a pre-filled search): show it in the field. Skipped while one of our
+  // own navigations is in flight, so a slow response can never overwrite what
+  // the customer is typing.
   useEffect(() => {
-    if (!dirty.current) setValue(urlTerm);
-  }, [urlTerm]);
+    if (isNavigating || urlTerm === lastWritten.current) return;
+    lastWritten.current = urlTerm;
+    setValue(urlTerm);
+  }, [urlTerm, isNavigating]);
 
+  // Typing: write to the URL once the debounce settles.
   useEffect(() => {
-    if (!dirty.current) return;
-    if (debounced === urlTerm) return;
-
-    const next = new URLSearchParams(params.toString());
-
-    if (debounced.trim()) next.set("search", debounced.trim());
-    else next.delete("search");
-
-    // Searching from a product page, the cart, or anywhere else should land on
-    // the catalogue — that is where results are rendered.
-    const target = pathname === "/" ? "/" : "/";
-    const query = next.toString();
-
-    // replace, not push: a search refined character by character would
-    // otherwise bury the previous page under a dozen history entries and make
-    // the back button useless.
-    router.replace(query ? `${target}?${query}` : target, { scroll: false });
-  }, [debounced, urlTerm, params, pathname, router]);
-
-  const commit = (term: string) => {
-    dirty.current = true;
-    setValue(term);
-  };
+    writeTerm(debounced);
+  }, [debounced, writeTerm]);
 
   const clear = () => {
-    commit("");
+    setValue("");
+    writeTerm(""); // no need to wait out the debounce
     inputRef.current?.focus();
   };
 
-  // The term is committed but the debounce has not yet caught up.
-  const pending = dirty.current && value !== debounced;
+  // Typed but not yet reflected in the URL, or the results are still loading.
+  const pending = value.trim() !== urlTerm || isNavigating;
 
   return (
     <form
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
-
-        // Enter should not wait out the debounce.
-        dirty.current = true;
-        const term = value.trim();
-        const next = new URLSearchParams(params.toString());
-
-        if (term) next.set("search", term);
-        else next.delete("search");
-
-        const query = next.toString();
-        router.replace(query ? `/?${query}` : "/", { scroll: false });
-
-        // Dismisses the on-screen keyboard on mobile, which otherwise covers
-        // the results the customer just asked for.
+        writeTerm(value); // Enter should not wait out the debounce
+        // Dismiss the mobile keyboard so it doesn't cover the results.
         inputRef.current?.blur();
         onSubmitted?.();
       }}
@@ -156,36 +137,32 @@ function SearchBarInner({
         type="search"
         name="search"
         value={value}
-        onChange={(e) => commit(e.target.value)}
+        onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
         aria-label="Search products"
         autoFocus={autoFocus}
         autoComplete="off"
-        // enterKeyHint puts "Search" on the mobile keyboard's action key
-        // instead of "Go", which is what the customer is actually doing.
         enterKeyHint="search"
         className={cn(
-          "h-11 w-full rounded-full border border-border bg-card pl-9 pr-10 text-sm outline-none",
+          "h-11 w-full min-w-0 appearance-none rounded-full border border-border bg-card pl-9 pr-10 outline-none",
           "focus:border-primary",
-          // 16px on mobile: anything smaller makes iOS Safari zoom the whole
-          // page on focus, which then leaves the layout scrolled sideways.
+          // 16px on mobile: smaller makes iOS Safari zoom the page on focus.
           "text-base sm:text-sm",
-          // Safari renders its own clear affordance on type=search; ours is
-          // consistent across browsers and reachable by keyboard.
-          "[&::-webkit-search-cancel-button]:appearance-none"
+          // Use our own clear button instead of Safari's.
+          "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
         )}
       />
 
       <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center">
-        {pending && <Spinner className="h-4 w-4 text-muted-foreground" />}
+        {pending && value.length > 0 && (
+          <Spinner className="h-4 w-4 text-muted-foreground" />
+        )}
 
         {!pending && value.length > 0 && (
           <button
             type="button"
             onClick={clear}
             aria-label="Clear search"
-            // 32px hit area inside a 44px-tall field: comfortably tappable
-            // without crowding the text.
             className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X size={15} />
