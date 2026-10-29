@@ -87,23 +87,19 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full border-b border-border/70 bg-background transition-shadow duration-200 ${
+      className={`sticky top-0 z-40 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 transition-shadow duration-200 ${
         isScrolled ? "shadow-md shadow-black/[0.06]" : "shadow-none"
       }`}
     >
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-5 lg:px-8">
-        {/*
-          Mobile: row 1 = logo + actions, row 2 = full-width search.
-          sm and up: everything on a single row.
-        */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-2.5 py-2.5 sm:min-h-[84px] sm:flex-nowrap sm:gap-3 sm:py-0 lg:gap-4">
-          {/* Logo */}
-          <div className="order-1 mr-auto flex min-w-0 shrink-0 items-center sm:mr-0">
-            <Logo className="h-9 w-auto sm:h-11" />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-3 py-3 sm:min-h-[84px] sm:flex-nowrap sm:gap-4 sm:py-0">
+          {/* Logo: fixed-height box so it centres on the same line as the icons */}
+<div className="order-1 mr-auto flex h-16 min-w-0 shrink items-center min-[400px]:h-[72px] sm:mr-0 sm:h-20 [&_img]:h-full [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_svg]:h-full [&_svg]:w-auto [&_svg]:max-w-full">
+            <Logo className="h-full w-auto" />
           </div>
 
-          {/* Actions */}
-          <div className="order-2 flex shrink-0 items-center gap-2 sm:order-3 sm:gap-3">
+          {/* Actions: one pill, every button the same size and centred */}
+          <div className="order-2 flex h-11 shrink-0 items-center gap-1 rounded-2xl bg-muted/60 p-1 sm:order-3 sm:h-12">
             <Link
               href="/dashboard/notifications"
               aria-label={
@@ -140,7 +136,7 @@ export function Header() {
                 <div
                   role="menu"
                   aria-label="Account menu"
-                  className="absolute right-0 top-full z-50 mt-3 w-56 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-border/70 bg-background p-1.5 shadow-xl shadow-black/10"
+                  className="absolute right-0 top-full z-50 mt-4 w-56 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-border/70 bg-background p-1.5 shadow-xl shadow-black/10"
                 >
                   <div className="flex items-center gap-3 border-b border-border/60 px-3 py-3">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
@@ -212,7 +208,7 @@ export function Header() {
             </button>
           </div>
 
-          {/* Search: full-width second row on mobile, flexible middle on sm+ */}
+          {/* Search: own row on mobile, flexible middle on sm+ */}
           <div className="order-3 w-full min-w-0 basis-full sm:order-2 sm:basis-0 sm:flex-1">
             <SearchBar className="w-full min-w-0" />
           </div>
